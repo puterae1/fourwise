@@ -110,11 +110,23 @@ text was lost in a context handover. Owner may re-cut these.
   clock-free. Then `wasm-pack` build into `web/src/engine/pkg/`, Vite +
   React scaffold, Web Worker wrapper + typed TS wrapper with time→nodes
   calibration. `sideToMove` stays `'first' | 'second'`, never a colour.
-- **Wave 4** (`web-ui`; design-lead already done): board rendering per
-  `docs/DESIGN-DIRECTION.md`, seat controls, the three modes (Play / Analyse /
-  Setup), game state + history. Includes the four-seat-combination test
-  (gate #2): identical evaluation across all four seat combinations,
-  differing only in presentation.
+- **Wave 4** (`web-ui`; design-lead already done), split in two, governed by
+  the 2026-07-28 owner pins (SPEC §1 amended acceptance test, §3.1 level
+  mechanics + engine-move-under-partial, §3.3 setup reconstruction in TS
+  with fifth verdict, ENGINE.md stale-result discard):
+  - **4a — game layer, test-first: COMPLETE, verifier PASS 2026-07-28.**
+    Four-seat gate test written first (fail-first confirmed) against the
+    amended assertion, extended to whole-AnalysisResult translation after
+    owner review; seat model, verdict translation (colour-free by design),
+    parity, levels (horizon clamp incl. boundary test), engine-move-under-
+    partial, blunder "not evaluated" semantics, setup reconstruction
+    (genuine memoized DFS; greedy counterexample tested) with all five
+    verdicts incl. no-hint branch + round-trip property tests, stale-token
+    discard with forced-race test. Two verifier rounds: three test-coverage
+    findings (incl. a decoy-stand-in vacuous assertion) found, fixed,
+    independently re-verified. 95 web tests + engine baseline green.
+  - **4b — designed UI:** board per `docs/DESIGN-DIRECTION.md`, seat
+    controls, three modes, history with jump-to-ply, wired to 4a.
 - **Wave 5** (`web-ui`): per-column analysis in plain language, blunder flag,
   parity ruler scoped to single threats, `localStorage` persistence.
 - **Wave 6** (`web-ui` + `verifier`): accessibility (keyboard, reduced motion,

@@ -24,8 +24,13 @@ reference site.
 
 **Gate — all must hold**
 1. Every reference test fixture returns its exact expected score.
-2. The four-seat-combination test passes: identical engine evaluation across all
-   four, differing only in presentation.
+2. The four-seat-combination test passes **as amended in SPEC §1
+   (2026-07-28)**: one engine result, four seats, four different
+   presentation outputs, each independently correct against hand-written
+   expectations, with engine inputs byte-identical across seats. (The
+   original wording — "identical engine evaluation across all four" — is
+   structurally guaranteed, cannot fail, and proves nothing; seat is not an
+   engine input.)
 3. Any reachable mid-game position analyses in under 1s on a mid-range phone.
 4. Keyboard-navigable, reduced-motion respected, usable one-handed in portrait.
 5. Deployed and loading from the GitHub Pages URL.

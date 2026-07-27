@@ -275,6 +275,18 @@ worker context):**
   win-in-one always reports that column as `score` even at budget 0 (O(1),
   never wrong).
 
+**Stale-result discard (amended 2026-07-28, owner-approved).** History
+jump-to-ply can land mid-progressive-loop, and a result computed for the old
+position must never be rendered against the new one — wrong verdicts on a
+board that looks right. Protocol: every worker request carries a token; the
+client tracks only the token belonging to the currently displayed position,
+discards any response bearing a different token, and a position change
+aborts the escalation loop (no further re-issues for the abandoned
+position). The UI keys rendered analysis by position string and must never
+display a result whose token does not match the shown board. A test must
+force the race: start a progressive analyse, change position before it
+completes, assert no update for the old position is delivered afterwards.
+
 Solving from an empty board is slow enough to feel broken on a phone. Precompute.
 
 `tools/gen_book.rs` enumerates all positions at depth 8, solves each exactly, and

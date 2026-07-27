@@ -54,9 +54,11 @@ The short version:
   checks it. `design-lead` (Opus, one-shot) sets the visual direction.
 - Subagents default to `model: inherit`. Every agent file here declares its model
   explicitly, and `.claude/settings.json` sets `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`
-  as a hard floor. One named exception, and only this one: lift the floor for the
-  single `design-lead` run (it must reach Opus), and restore it the moment that
-  run returns. No other reason justifies lifting it.
+  as a hard floor. The floor is baked into the session env at launch and cannot be
+  lowered mid-session at all — by design, since that also means it cannot be
+  accidentally lifted. The one sanctioned exception, the single `design-lead` run
+  (it must reach Opus), runs as a headless `claude -p --model opus` from the
+  shell, never as a subagent. See `docs/ORCHESTRATION.md`.
 - **Never use `/subtask`.** A fork inherits the main session's model with no
   override, so it always runs on Fable.
 - Delegation prompts must carry: governing spec path, exact deliverable, the command

@@ -62,9 +62,31 @@ This cuts both ways. As a safety net it is excellent:
 CLAUDE_CODE_SUBAGENT_MODEL=sonnet claude --model fable
 ```
 
-Now no subagent can reach Fable regardless of what its file says. Use this. But
-remember it is set, because it will also silently override the one agent you
-deliberately wanted on Opus.
+Now no subagent can reach Fable regardless of what its file says. Use this.
+
+Two facts about the floor, both proven empirically (2026-07-27, at the cost of
+two wasted Sonnet runs):
+
+1. **It is baked at session launch.** Editing `settings.json` mid-session does
+   nothing, and the per-invocation `model:` parameter loses to it. The floor
+   cannot be lowered while a session is running — at all. An earlier version of
+   this document said to comment the line out for the design-lead run and
+   restore it. That does not work.
+2. **That is better than intended.** A guard that cannot be lifted mid-session
+   also cannot be accidentally lifted. Leave it set permanently.
+
+The one agent that must beat the floor — `design-lead`, which needs Opus — does
+not run as a subagent at all. The sanctioned escape is a headless run from the
+shell:
+
+```bash
+claude -p "<full delegation prompt>" --model opus \
+  --allowedTools "Read,Write,Grep,Glob" --output-format json
+```
+
+The headless main loop is not a subagent, so the floor never applies to it.
+Afterwards, verify the model from the JSON `modelUsage` keys (or grep the run's
+transcript for `"model":`) — never trust the label.
 
 ---
 

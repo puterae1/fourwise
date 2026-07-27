@@ -1,5 +1,5 @@
 {
-  "_comment": "Project settings for connect4-lab. CLAUDE_CODE_SUBAGENT_MODEL is the hard quota guard: it sits above per-invocation and frontmatter values in the resolution order, so with it set to sonnet NO subagent can reach Fable regardless of its file. Trade-off: it also overrides design-lead's model:opus. Comment that line out for the single design-lead run, then restore it.",
+  "_comment": "Project settings for connect4-lab. CLAUDE_CODE_SUBAGENT_MODEL is the hard quota guard: it sits above per-invocation and frontmatter values, so NO subagent can reach Fable (or Opus) regardless of its file. It is baked into the session env at launch — editing this file mid-session does NOT lift it, which also means it cannot be accidentally lifted. Leave it set permanently. The one sanctioned exception (design-lead on Opus) runs headless: claude -p --model opus. See docs/ORCHESTRATION.md.",
 
   "env": {
     "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",

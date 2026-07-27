@@ -1,0 +1,12 @@
+{
+  "_comment": "Project settings for connect4-lab. CLAUDE_CODE_SUBAGENT_MODEL is the hard quota guard: it sits above per-invocation and frontmatter values in the resolution order, so with it set to sonnet NO subagent can reach Fable regardless of its file. Trade-off: it also overrides design-lead's model:opus. Comment that line out for the single design-lead run, then restore it.",
+
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "2"
+  },
+
+  "permissions": {
+    "deny": []
+  }
+}

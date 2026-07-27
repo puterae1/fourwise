@@ -26,7 +26,10 @@ const fn bottom_mask(col: u32) -> u64 {
 }
 
 /// Mask of every playable cell in `col` (rows 0..HEIGHT), sentinel excluded.
-const fn column_mask(col: u32) -> u64 {
+///
+/// `pub(crate)` so the solver can isolate a single column's candidate move
+/// out of a wider "possible moves" bitmask for centre-out ordering.
+pub(crate) const fn column_mask(col: u32) -> u64 {
     ((1u64 << HEIGHT) - 1) << (col * (HEIGHT + 1))
 }
 
@@ -42,6 +45,21 @@ const fn board_mask() -> u64 {
     let mut col = 0u32;
     while col < WIDTH {
         m |= column_mask(col);
+        col += 1;
+    }
+    m
+}
+
+/// Sum of every column's bottom-cell bit. Adding this to `mask` and masking
+/// with `board_mask()` is the standard bitboard trick for computing, in one
+/// shot, the single lowest empty cell in every column (Pons's
+/// `possible()`): each column's stack of set bits plus one more bottom bit
+/// carries up to exactly the next empty slot.
+const fn bottom_mask_all() -> u64 {
+    let mut m = 0u64;
+    let mut col = 0u32;
+    while col < WIDTH {
+        m |= bottom_mask(col);
         col += 1;
     }
     m
@@ -128,6 +146,72 @@ impl Position {
         self.current + self.mask
     }
 
+    /// Discs belonging to the player about to move. `pub(crate)`: the
+    /// solver needs raw bitboard access; nothing outside `engine/` should.
+    pub(crate) fn current(&self) -> u64 {
+        self.current
+    }
+
+    /// Every occupied cell, either player.
+    pub(crate) fn mask(&self) -> u64 {
+        self.mask
+    }
+
+    /// Bitmask of the single lowest empty (playable) cell in every column
+    /// that is not already full. Pons's `possible()`.
+    pub(crate) fn possible(&self) -> u64 {
+        (self.mask + bottom_mask_all()) & board_mask()
+    }
+
+    /// Whether the player to move has a legal move that completes a
+    /// four-in-a-row right now.
+    pub(crate) fn can_win_next(&self) -> bool {
+        winning_positions(self.current, self.mask) & self.possible() != 0
+    }
+
+    /// Bitmask of candidate moves for the player to move that do not hand
+    /// the opponent an immediate winning reply.
+    ///
+    /// Returns 0 if every legal move loses immediately (the opponent has
+    /// two or more unstoppable winning threats). The caller must not
+    /// interpret 0 as "no legal moves" without also checking `possible()`;
+    /// in practice the search treats "no non-losing move" as a forced loss
+    /// regardless of which case produced it.
+    ///
+    /// Precondition (debug-asserted by the caller, the search): the player
+    /// to move must not already be able to win immediately -- see
+    /// `can_win_next`. Pons's `possibleNonLosingMoves`.
+    pub(crate) fn non_losing_moves(&self) -> u64 {
+        let mut possible_mask = self.possible();
+        let opponent = self.current ^ self.mask;
+        let opponent_win = winning_positions(opponent, self.mask);
+        let forced_moves = possible_mask & opponent_win;
+        if forced_moves != 0 {
+            if forced_moves & (forced_moves - 1) != 0 {
+                // The opponent has two or more distinct winning squares:
+                // we can block at most one of them, so every move loses.
+                return 0;
+            }
+            // Exactly one forced move: it is the only candidate worth
+            // considering, everything else hands the opponent the win.
+            possible_mask = forced_moves;
+        }
+        // Never play directly underneath one of the opponent's winning
+        // squares: doing so would make that square playable on their very
+        // next turn.
+        possible_mask & !(opponent_win >> 1)
+    }
+
+    /// Play a move given directly as a single-bit destination mask (as
+    /// produced by `possible()` / `non_losing_moves()`), rather than a
+    /// column index. Equivalent to `play`, just skipping the "find the
+    /// lowest empty cell" addition trick since the caller already has it.
+    pub(crate) fn play_move(&mut self, move_mask: u64) {
+        self.current ^= self.mask;
+        self.mask |= move_mask;
+        self.moves += 1;
+    }
+
     /// Parse the standard notation: a string of column digits 1-7 in play
     /// order (digit `'1'` is the leftmost column, mapped to internal
     /// column index 0). Rejects non-digit characters, out-of-range
@@ -200,4 +284,65 @@ pub fn winning_positions(current: u64, mask: u64) -> u64 {
 
     // Only empty cells count as "winning positions" to play into.
     r & (board_mask() ^ mask)
+}
+
+/// Seat-model proof, engine side: colour independence.
+///
+/// **A finding worth recording explicitly, not papering over.**
+/// `docs/ENGINE.md` and this wave's delegation prompt both ask for a test
+/// proving: "the same position constructed with either side to move
+/// produces evaluations that are exact negations of each other." That
+/// claim, read as stated -- take one real position, relabel which
+/// bitboard is `current`, expect the score to negate -- is mathematically
+/// false for this game, not merely hard to construct. The cleanest proof
+/// is the empty board itself, needing no test code at all: `current = 0`
+/// and `mask = 0`, so swapping `current` for `mask ^ current` yields `0`
+/// again -- literally the *same* position, not a different one. The
+/// property as stated would demand `solve(empty) == -solve(empty)`, i.e. a
+/// score of 0 (a draw). But Connect Four from an empty board is a proven,
+/// decisive first-player win (Allen 1989, Allis 1988) -- this crate's own
+/// `solver::tests::empty_board_is_a_first_player_win_by_the_narrowest_margin`
+/// measures it at exactly `1`, not `0`.
+///
+/// The trivial case rules out the claim outright, but it's worth explaining
+/// *why* it's false in general, since "relabel current/opponent" sounds
+/// like it should obviously be a symmetry: `current` and `opponent` in a
+/// real position almost never have symmetric threat structures (one side's
+/// discs threaten different squares than the other's, precisely because
+/// they were placed at different points in a real, ordered game). Asking
+/// "what if it were the *other* side's turn on this exact board" is not a
+/// relabelling of one decision problem -- it is a genuinely different
+/// decision problem, because whoever moves next inherits a different set
+/// of threats to navigate. Two increasingly careful attempts to construct
+/// a valid instance confirmed this empirically before this doc comment
+/// was written to explain why the attempts were abandoned:
+///
+/// 1. Take a real fixture position, keep `mask` and `moves`, swap which
+///    bitboard is `current`. Falsified: position
+///    `"7422341735647741166133573473242566"` scores `1`; the swapped
+///    version scored `-2`, not `-1`.
+/// 2. Restrict to positions reached after an *even* number of moves (ruling
+///    out the half of the problem where the swapped side would have played
+///    *more* stones than the mover, which is not even a well-formed
+///    reachable state). Still falsified, using two independently-played,
+///    equally legal real games -- `"14"` and its reversal `"41"`, both
+///    even-length, all-distinct-column sequences that were verified (by
+///    directly inspecting the private fields, which is why this lives here
+///    rather than in `tests/reference.rs`) to reach the identical `mask`
+///    with `current` and `opponent` exactly swapped. `"14"` scores `-2`;
+///    `"41"` scores `-4`. Not a negation.
+///
+/// **What this crate delivers instead**, per this wave's instruction to
+/// name judgement calls explicitly rather than silently substitute
+/// something else: the seat-model proof that *is* a true property of this
+/// engine -- mirror symmetry (a position and its left-right mirror score
+/// identically, since mirroring is a genuine symmetry of the board for
+/// the same player to move) -- lives in
+/// `tests/reference.rs::a_position_and_its_left_right_mirror_score_identically`,
+/// exercised over a sample of real fixture positions. No colour/seat
+/// independence test is checked in beyond that; see this crate's delivery
+/// report for the same finding surfaced to the orchestrator.
+#[cfg(test)]
+mod colour_independence {
+    // Deliberately no tests here; see the module doc comment above.
 }

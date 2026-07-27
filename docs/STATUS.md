@@ -44,6 +44,24 @@
   "Show me" in Analyse — a swap of the doc's original assignment. Original
   recommendation preserved in §14.1 marked OVERRULED, with rationale.
 
+- **Wave 2 — COMPLETE, verifier PASS 2026-07-28.** Delivered:
+  solver.rs (full Pons optimisation ladder), tt.rs (prime-sized, 8-byte
+  packed entries; one real TT sizing bug found and fixed en route), all six
+  Pons fixture sets in `tests/fixtures/`, `tests/reference.rs`, mirror
+  seat-model proof. Verified: debug tests clean (39), clippy clean; release
+  run exact on L3_R1, L2_R1, L2_R2, L1_R1, L1_R2 (5000 positions).
+  Resolved since: `test_l1_r3` completed OK — full release run 7/7 in
+  1949 s, all 6000 fixture positions exact. Owner approved both ENGINE.md
+  amendments (stop condition re-based to fixtures-exact + mid-game < 1 s;
+  colour-independence negation invariant replaced by mirror + negamax
+  self-consistency, empty-board counterexample recorded in the doc).
+  Negamax self-consistency test added (45 sampled positions, independent
+  2D-grid oracle for terminal detection). Independent `verifier` audit:
+  PASS on all 7 criteria — full suites clean, 6000/6000 fixture positions
+  exact (direct re-runs + completed-run log), mid-game solves ≤ 26 ms in
+  release, colour-blindness/sentinel/no-unsafe invariants confirmed,
+  fixtures integrity and score convention hand-verified.
+
 ## In flight
 
 Nothing. No agents running.

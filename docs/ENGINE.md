@@ -109,8 +109,17 @@ Required optimisations, roughly in order of payoff:
 7. **Better move ordering by threat count** — order by the number of winning squares
    each move creates.
 
-Stop when an empty board solves in under a second. That is far beyond what this tool
-needs; further optimisation is not sanctioned work.
+**Stop condition (amended 2026-07-28, owner-approved):** stop optimising when
+every reference fixture returns its exact score and mid-game positions solve
+well under a second. Opening-board speed is Phase 2's problem — the opening
+book exists precisely because deep openings are slow to search (a full
+empty-board solve measured ~115 s with the optimisation set above, consistent
+with Pons's own published benchmarks for this technique set). This amends an
+invented stop condition from an earlier version of this document ("empty board
+under one second"), which was unachievable with the sanctioned techniques. The
+ROADMAP Phase 1 gate — any reachable mid-game position under 1 s on a
+mid-range phone — is a gate, was always the real bar, and is unchanged by
+this amendment.
 
 ---
 
@@ -136,10 +145,24 @@ Additional invariant tests:
 - Playing a move then undoing returns the identical `(current, mask, moves)` triple
 - `key()` collides for no two distinct reachable positions in a depth-10 enumeration
 - A position and its left-right mirror score identically
-- **Colour independence:** the same position constructed with either side to move
-  produces evaluations that are exact negations of each other
+- **Negamax self-consistency:** for a sample of non-terminal fixture
+  positions, the score equals the maximum of the children's negated scores
+  (terminal win/draw cases handled directly)
 
-That last one is the engine-side proof of the seat model.
+**Why there is no "colour independence" test (amended 2026-07-28,
+owner-approved).** An earlier version of this document required: "the same
+position constructed with either side to move produces evaluations that are
+exact negations of each other." That claim is mathematically false, not
+merely hard to test. Counterexample: on an empty board both bitboards are
+zero, so swapping which side is to move changes nothing — the claim would
+force score(empty) = −score(empty) = 0, but Connect 4 from an empty board is
+a proven first-player win (this engine correctly scores it +1). Negation
+under side-swap does not hold in a game with zugzwang. The engine's
+colour-blindness needs no such test because it is structural: engine state is
+only `(current, mask)` — there is no colour in `engine/` to leak. The
+seat-model proof is the game layer's four-seat-combination test (ROADMAP
+gate 2), supported engine-side by the mirror and self-consistency invariants
+above.
 
 ---
 

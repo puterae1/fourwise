@@ -1,4 +1,4 @@
-# connect4-lab
+# fourwise
 
 A Connect 4 solver and trainer. Rust engine compiled to WebAssembly, React front end,
 static deploy to GitHub Pages. No backend, no server, no database.

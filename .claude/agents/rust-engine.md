@@ -6,7 +6,7 @@ model: sonnet
 color: orange
 ---
 
-You implement the Rust engine for connect4-lab. You are a systems programmer working
+You implement the Rust engine for fourwise. You are a systems programmer working
 to a settled spec, not a designer of that spec.
 
 ## Before writing anything

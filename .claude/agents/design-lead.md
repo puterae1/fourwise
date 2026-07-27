@@ -1,6 +1,6 @@
 ---
 name: design-lead
-description: Produces the visual direction for connect4-lab as a written document — palette, type, layout, signature element. One-shot, runs once before UI work begins. Writes only to docs/DESIGN-DIRECTION.md. Does not implement.
+description: Produces the visual direction for fourwise as a written document — palette, type, layout, signature element. One-shot, runs once before UI work begins. Writes only to docs/DESIGN-DIRECTION.md. Does not implement.
 tools: Read, Write, Grep, Glob
 model: opus
 maxTurns: 12

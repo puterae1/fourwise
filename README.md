@@ -1,4 +1,4 @@
-# connect4-lab — handover package
+# fourwise — handover package
 
 Build a Connect 4 analysis tool that fixes what `connect4.gamesolver.org` gets wrong.
 
@@ -24,7 +24,7 @@ That is the entire reason this project exists. Everything else is secondary.
 | `docs/OPPONENT-MODEL.md` | Phase 3. Logging real games, modelling her play. |
 | `docs/CAMERA.md` | Phase 4. Specced, not sanctioned. |
 | `docs/ORCHESTRATION.md` | Model routing, quota strategy, delegation protocol. |
-| `.claude/agents/*.md` | The five subagent definitions. |
+| `.claude/agents/*.md` | The seven subagent definitions. |
 | `.claude/settings.json` | Subagent model floor and nesting cap. |
 
 ## How to start
@@ -32,7 +32,7 @@ That is the entire reason this project exists. Everything else is secondary.
 Copy everything to the repo root, keeping the `.claude/` and `docs/` structure:
 
 ```bash
-mkdir connect4-lab && cd connect4-lab
+mkdir fourwise && cd fourwise
 git init
 # copy CLAUDE.md, README.md, docs/, and .claude/ into place
 claude --model fable
@@ -53,9 +53,11 @@ The main session runs on Fable and does architecture, delegation, and gate
 judgement. Everything else runs on Sonnet. `design-lead` runs once on Opus.
 
 `.claude/settings.json` sets `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`, which overrides
-every agent file and guarantees no subagent reaches Fable. It also overrides
-`design-lead`'s `model: opus` — comment that env line out for the single
-design-lead run, then restore it. See `docs/ORCHESTRATION.md`.
+every agent file and guarantees no subagent reaches Fable. It is baked into the
+session env at launch and cannot be lowered mid-session — which also means it
+cannot be accidentally lifted. It overrides `design-lead`'s `model: opus` too;
+the sanctioned escape for that one run is a headless `claude -p --model opus`
+from the shell, never a settings edit. See `docs/ORCHESTRATION.md`.
 
 ## Non-negotiables
 

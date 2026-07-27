@@ -44,16 +44,32 @@ const TOTAL_CELLS: i32 = (WIDTH * HEIGHT) as i32;
 /// `docs/ENGINE.md`, a large effect on alpha-beta cutoff rate.
 const COLUMN_ORDER: [u32; WIDTH as usize] = [3, 2, 4, 1, 5, 0, 6];
 
+/// Marker returned by the budgeted search path when the node budget is
+/// exhausted before a definite score is reached. Carries no data -- the
+/// caller (`analyse`) already knows which column it was searching and
+/// reports that column as `unknown`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Aborted;
+
 /// A reusable negamax searcher with its own transposition table.
 ///
 /// Positions are searched by value (`Position` is `Copy`); nothing here
 /// mutates or shares state across searches except the transposition table,
 /// which is safe and beneficial to reuse across independent positions
 /// (the key already uniquely identifies a position, regardless of which
-/// search asked for it).
+/// search asked for it) -- and, per `docs/ENGINE.md`'s WASM-boundary pin,
+/// safe and intended to be reused across many `analyse` calls from a
+/// single long-lived instance.
 pub struct Solver {
     tt: TranspositionTable,
     nodes: u64,
+    /// `Some(n)` while a budgeted search is active: `n` is the absolute
+    /// value `self.nodes` must reach before the search aborts (i.e. "nodes
+    /// counted at the start of this budgeted call, plus the budget").
+    /// `None` for the plain unbudgeted `solve`, which therefore can never
+    /// abort. Deliberately a node count, not a clock: `docs/ENGINE.md`
+    /// pins the engine as clock-free and deterministic.
+    budget_limit: Option<u64>,
 }
 
 impl Default for Solver {
@@ -69,31 +85,81 @@ impl Solver {
         Solver {
             tt: TranspositionTable::with_byte_budget(crate::tt::DEFAULT_BYTE_BUDGET),
             nodes: 0,
+            budget_limit: None,
         }
     }
 
     /// Build a solver with a caller-supplied transposition table (tests use
     /// this for smaller tables to keep debug runs fast).
     pub fn with_tt(tt: TranspositionTable) -> Self {
-        Solver { tt, nodes: 0 }
+        Solver {
+            tt,
+            nodes: 0,
+            budget_limit: None,
+        }
     }
 
-    /// Number of `negamax` calls made across every `solve` this solver has
-    /// run. Exposed for benchmarking, not correctness.
+    /// Number of `negamax` calls made across every `solve`/`solve_budgeted`
+    /// this solver has run over its whole lifetime. Exposed for
+    /// benchmarking and so callers (e.g. `analyse`) can measure nodes spent
+    /// in a single call by differencing before/after. Not itself reset by
+    /// a budgeted call -- see `solve_budgeted`.
     pub fn node_count(&self) -> u64 {
         self.nodes
     }
 
     /// The exact score of `pos`, from the perspective of the player to
-    /// move, per `docs/ENGINE.md`'s convention.
+    /// move, per `docs/ENGINE.md`'s convention. Unbudgeted: runs to
+    /// completion regardless of node count.
     pub fn solve(&mut self, pos: &Position) -> i32 {
+        debug_assert!(
+            self.budget_limit.is_none(),
+            "solve() must not be called while a budgeted search is in flight"
+        );
+        // `budget_limit` stays `None` throughout, so `negamax` never
+        // returns `Err(Aborted)` on this path -- see its budget check.
+        self.solve_inner(pos)
+            .expect("unbudgeted solve() can never abort: budget_limit is None throughout")
+    }
+
+    /// The exact score of `pos`, or `None` if `budget` nodes were exhausted
+    /// before the search reached a definite answer. `budget` is nodes, not
+    /// milliseconds or wall time -- there is no clock anywhere in this
+    /// module, per `docs/ENGINE.md`'s WASM-boundary pin.
+    ///
+    /// The transposition table is untouched by aborting: any node that
+    /// *did* get proven exact or bounded before the abort stays cached, so
+    /// a later call with a bigger budget on the same `Solver` (the "still
+    /// thinking" re-issue loop the worker runs) makes real incremental
+    /// progress instead of restarting from scratch.
+    pub fn solve_budgeted(&mut self, pos: &Position, budget: u64) -> Option<i32> {
+        let start = self.nodes;
+        self.budget_limit = Some(start.saturating_add(budget));
+        let result = self.solve_inner(pos);
+        self.budget_limit = None;
+        result.ok()
+    }
+
+    /// Shared core of `solve` and `solve_budgeted`: the immediate-win
+    /// short-circuit plus the null-window iterative-deepening loop, both
+    /// unchanged from the pre-budget implementation. The only difference
+    /// between the two public entry points is whether `self.budget_limit`
+    /// is set before calling this, which is what makes `negamax` capable of
+    /// returning `Err(Aborted)` at all.
+    ///
+    /// Note the immediate-win check runs before any budget accounting: a
+    /// position with a winning move available is resolved in O(1) with no
+    /// search, so it is reported as solved even under a budget of zero.
+    /// This is a deliberate judgement call, not an oversight -- see this
+    /// module's delivery report.
+    fn solve_inner(&mut self, pos: &Position) -> Result<i32, Aborted> {
         // Optimisation 2: immediate win check. A very cheap test relative
         // to a full search, and one that fires often in practice (this is
         // called once per column per UI analysis, not just at the root of
         // a single search) -- see the module-level invariant note above
         // for why this never needs re-checking deeper in the tree.
         if pos.can_win_next() {
-            return immediate_win_score(pos);
+            return Ok(immediate_win_score(pos));
         }
 
         // Optimisation 6: iterative deepening via null-window search. This
@@ -111,17 +177,17 @@ impl Solver {
             } else if med >= 0 && max / 2 > med {
                 med = max / 2;
             }
-            let r = self.negamax(pos, med, med + 1);
+            let r = self.negamax(pos, med, med + 1)?;
             if r <= med {
                 max = r;
             } else {
                 min = r;
             }
         }
-        min
+        Ok(min)
     }
 
-    fn negamax(&mut self, pos: &Position, mut alpha: i32, mut beta: i32) -> i32 {
+    fn negamax(&mut self, pos: &Position, mut alpha: i32, mut beta: i32) -> Result<i32, Aborted> {
         debug_assert!(alpha < beta);
         debug_assert!(
             !pos.can_win_next(),
@@ -129,6 +195,16 @@ impl Solver {
              the caller (solve(), or this function's own move loop via non_losing_moves) \
              is responsible for filtering those out first"
         );
+
+        // Budget check happens before this node is counted, so a budget of
+        // zero aborts before doing any work at all rather than off-by-one
+        // undercounting. Skipped entirely when `budget_limit` is `None`
+        // (the unbudgeted `solve` path), so this can never fire there.
+        if let Some(limit) = self.budget_limit {
+            if self.nodes >= limit {
+                return Err(Aborted);
+            }
+        }
 
         self.nodes += 1;
 
@@ -140,12 +216,12 @@ impl Solver {
         // opponent already has two or more unstoppable threats.
         let possible = pos.non_losing_moves();
         if possible == 0 {
-            return -(TOTAL_CELLS - moves) / 2;
+            return Ok(-(TOTAL_CELLS - moves) / 2);
         }
 
         // Every remaining cell will be filled with no winner: a draw.
         if moves >= TOTAL_CELLS - 2 {
-            return 0;
+            return Ok(0);
         }
 
         // Tighten the window to the range of scores actually reachable
@@ -154,14 +230,14 @@ impl Solver {
         if alpha < min {
             alpha = min;
             if alpha >= beta {
-                return alpha;
+                return Ok(alpha);
             }
         }
         let max = (TOTAL_CELLS - 1 - moves) / 2;
         if beta > max {
             beta = max;
             if alpha >= beta {
-                return beta;
+                return Ok(beta);
             }
         }
 
@@ -169,12 +245,12 @@ impl Solver {
         let key = pos.key();
         if let Some(bound) = self.tt.get(key) {
             match bound {
-                Bound::Exact(v) => return v,
+                Bound::Exact(v) => return Ok(v),
                 Bound::Lower(v) => {
                     if v > alpha {
                         alpha = v;
                         if alpha >= beta {
-                            return alpha;
+                            return Ok(alpha);
                         }
                     }
                 }
@@ -182,7 +258,7 @@ impl Solver {
                     if v < beta {
                         beta = v;
                         if alpha >= beta {
-                            return beta;
+                            return Ok(beta);
                         }
                     }
                 }
@@ -209,11 +285,15 @@ impl Solver {
             child.play_move(m);
             // See the module-level invariant note: `child.can_win_next()`
             // is guaranteed false here by construction of `non_losing_moves`.
-            let score = -self.negamax(&child, -beta, -alpha);
+            // The `?` here is the abort propagation path: if the budget
+            // runs out anywhere in this subtree, this whole node aborts
+            // too, all the way back up to `solve_budgeted`, rather than
+            // returning a partially-searched (and therefore wrong) score.
+            let score = -self.negamax(&child, -beta, -alpha)?;
 
             if score >= beta {
                 self.tt.insert(key, Bound::Lower(score));
-                return score;
+                return Ok(score);
             }
             if score > alpha {
                 alpha = score;
@@ -226,7 +306,7 @@ impl Solver {
             Bound::Upper(alpha)
         };
         self.tt.insert(key, bound);
-        alpha
+        Ok(alpha)
     }
 }
 
@@ -315,5 +395,59 @@ mod tests {
                 "solving {moves:?} with a reused solver must match a fresh one"
             );
         }
+    }
+
+    #[test]
+    fn a_zero_node_budget_aborts_a_position_that_needs_real_search() {
+        // Same End-Easy fixture as above: not an immediate win (checked
+        // below), so any real search work at all requires at least one
+        // `negamax` call -- a budget of zero must therefore abort before
+        // producing a score.
+        let pos = Position::from_moves("2252576253462244111563365343671351441").unwrap();
+        assert!(!pos.can_win_next());
+        let mut solver = Solver::new();
+        assert_eq!(solver.solve_budgeted(&pos, 0), None);
+    }
+
+    #[test]
+    fn a_generous_budget_matches_the_unbudgeted_score() {
+        let pos = Position::from_moves("2252576253462244111563365343671351441").unwrap();
+        let mut budgeted = Solver::new();
+        let mut unbudgeted = Solver::new();
+        let expected = unbudgeted.solve(&pos);
+        let actual = budgeted
+            .solve_budgeted(&pos, 1_000_000)
+            .expect("1,000,000 nodes is far more than this End-Easy position needs");
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn a_bigger_budget_on_the_same_solver_can_finish_what_a_tiny_one_left_unsolved() {
+        // The transposition-table-reuse pin: a second call with more budget
+        // on the *same* `Solver` must be able to make progress a fresh
+        // solver given only the incremental budget could not necessarily
+        // make in the same node count, and must always eventually agree
+        // with the unbudgeted answer.
+        let pos = Position::from_moves("2252576253462244111563365343671351441").unwrap();
+        let mut solver = Solver::new();
+        assert_eq!(solver.solve_budgeted(&pos, 0), None);
+        let finished = solver
+            .solve_budgeted(&pos, 1_000_000)
+            .expect("re-issuing with a much larger budget must complete");
+        assert_eq!(finished, solve(&pos));
+    }
+
+    #[test]
+    fn immediate_win_positions_are_solved_even_under_a_zero_budget() {
+        // Documented judgement call: the immediate-win short-circuit runs
+        // before any budget accounting, so it is "free" regardless of the
+        // budget passed in.
+        let pos = Position::from_moves("273747").unwrap();
+        assert!(pos.can_win_next());
+        let mut solver = Solver::new();
+        assert_eq!(
+            solver.solve_budgeted(&pos, 0),
+            Some(immediate_win_score(&pos))
+        );
     }
 }

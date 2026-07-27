@@ -6,7 +6,7 @@ model: sonnet
 color: yellow
 ---
 
-You handle general multi-step tasks for connect4-lab that fit neither
+You handle general multi-step tasks for fourwise that fit neither
 `rust-engine`, `web-ui`, `verifier`, nor `Explore`.
 
 ## Why this file exists

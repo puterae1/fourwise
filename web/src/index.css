@@ -1,0 +1,59 @@
+:root {
+  --colour-bg: #14181c;
+  --colour-surface: #1e242b;
+  --colour-border: #333c46;
+  --colour-text: #e8ecef;
+  --colour-text-dim: #9aa5b1;
+  --colour-accent: #4fa3ff;
+  --colour-good: #3ecf8e;
+  --colour-bad: #ff6b6b;
+  --colour-unknown: #d9b64e;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --radius: 0.5rem;
+  --focus-ring: 0.1875rem solid var(--colour-accent);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--colour-bg);
+  color: var(--colour-text);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  line-height: 1.4;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Disabled outright, not shortened — a fast pulse is still motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

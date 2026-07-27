@@ -168,41 +168,112 @@ above.
 
 ## WASM boundary
 
-Keep it narrow. Exported surface:
+Keep it narrow. Exported surface (amended 2026-07-28, owner-approved — five
+interface decisions pinned before Wave 3):
 
 ```rust
 #[wasm_bindgen]
-pub fn analyse(position: &str) -> JsValue;   // -> AnalysisResult
+pub fn analyse(position: &str, node_budget: u32) -> JsValue;  // -> AnalysisResult
 #[wasm_bindgen]
-pub fn best_move(position: &str, level: u8) -> i32;
-#[wasm_bindgen]
-pub fn legal_moves(position: &str) -> Vec<u32>;
+pub fn legal_moves(position: &str) -> Vec<u32>;               // 0-indexed columns
 ```
+
+`best_move` is deliberately absent — see "Levels" below.
 
 Position encoding is the standard notation: a string of column digits 1–7 in play
 order, e.g. `"4453"`. Compact, human-readable, trivially serialisable into the game
 log, and directly compatible with the published test fixtures.
 
+**Indexing (pin).** 0-indexed everywhere in the API: `columns`, `best`,
+`legal_moves` entries, and threat square indices are all 0-based. The ONLY
+1-indexed surface is the position-string digits, which exist for human
+readability and fixture compatibility; the parser maps digit `'1'` → column 0.
+Threat square indices use the bitboard layout, `col * 7 + row`, row 0 at the
+bottom, sentinel row never reported.
+
+**Budgeted analysis (pin).** Search from near-empty boards can take minutes
+(see the stop-condition amendment above), and Wave 3 ships before the Phase 2
+book exists. `analyse` therefore takes an explicit budget and never runs
+unbounded. The budget is in NODES, not milliseconds — deterministic,
+clock-free, natively testable; the worker maps a time preference to nodes
+(order of 10–20 M nodes ≈ 1 s in WASM; calibrate once at load). When the
+budget is exhausted, unsolved columns report `kind: 'unknown'` and
+`complete: false`. Because the TT persists across calls (pin below), the
+worker re-issues `analyse` with a larger budget to make progress — that is
+the "still thinking" loop. Per SPEC §6 (no placeholder data), the UI must
+render `unknown` honestly as still-thinking/not-computed, never as a score,
+a guess, or a blank verdict.
+
 `AnalysisResult` shape:
 
 ```ts
+type ColumnEval =
+  | { kind: 'score'; score: number }  // exact; from the CURRENT MOVER's perspective
+  | { kind: 'full' }                  // column is full, no move exists
+  | { kind: 'unknown' };              // budget exhausted before this column solved
+
 interface AnalysisResult {
-  scores: (number | null)[];   // index 0-6, null if column is full
-  best: number;                // column index
+  columns: ColumnEval[];   // length 7, index = 0-based column
+  best: number | null;     // 0-based; null unless every non-full column is 'score'
+  complete: boolean;       // true iff no column is 'unknown'
   sideToMove: 'first' | 'second';   // NOT a colour
-  threats: { current: number[]; opponent: number[] };  // square indices
-  nodes: number;
-  elapsedMs: number;
+  threats: { current: number[]; opponent: number[] };  // 0-based square indices
+  nodes: number;           // nodes actually spent in this call
 }
 ```
+
+There is no `elapsedMs`: the engine is clock-free by design; the worker
+measures wall time itself.
+
+**Score point of view (pin).** Each column `score` is from the perspective of
+the side to move in the ANALYSED position: it is the negation of the child
+position's own score. Positive = playing this column wins for the player
+about to move. Getting this wrong inverts every verdict in the app — the
+exact bug class this project exists to kill, arriving through a different
+door — so tests must assert it directly: a column's entry equals minus the
+solved score of the resulting child position.
+
+**Levels (pin).** `best_move(position, level)` is removed from the surface.
+SPEC §3.1's play-strength levels are implemented in the game layer, in
+TypeScript, from the candidate set `analyse` already returns — e.g. "Strong"
+picks uniformly among columns within 2 points of the best. Rationale: an RNG
+inside the engine would drag in `getrandom`, make the engine
+non-deterministic, and put the handicap logic in the least testable place.
+The engine stays deterministic; JS picks.
+
+**Transposition-table lifetime (pin).** The ~64 MB table is allocated ONCE
+per worker at module level (`thread_local!` or equivalent) and reused across
+every `analyse` call — never allocated per call. Cross-position reuse is safe
+(keys are globally unique) and is what makes the bigger-budget re-issue loop
+cheap. The worker holds exactly one WASM instance.
 
 `sideToMove` is deliberately not a colour. The game layer maps it.
 
 Run analysis in a Web Worker. Deep positions must never block the UI thread.
 
----
+**Boundary mechanics (amended 2026-07-28 — pinned from the implementation so
+the TS wrapper cannot guess wrong; verified by running the built module in a
+worker context):**
 
-## Opening book (Phase 2)
+- `AnalysisResult` crosses the boundary as a plain JS object via
+  `serde-wasm-bindgen` — NOT a JSON string. Field names are camelCase;
+  `ColumnEval` arrives as the tagged unions above (`{ kind: 'score', score }`
+  etc.); `sideToMove` as the strings `'first'` / `'second'`.
+- **`best` arrives as `undefined`, not `null`,** when absent (serde `None` →
+  `undefined`). The typed TS wrapper in `web/src/engine/` must normalise it
+  to `null` so application code sees `number | null` exactly as specced
+  above. Normalisation is the wrapper's job; nothing downstream may see
+  `undefined`.
+- `legal_moves` returns a `Uint32Array`; the wrapper converts to `number[]`.
+- Invalid position strings make both exports throw a JS exception with a
+  readable message (wasm-bindgen `Result` → thrown error). They never panic
+  and never return a partial result. The thrown value is a plain string,
+  not an `Error` instance — the TS wrapper catches either and always
+  surfaces a typed `EngineError` to callers.
+- `best` tie-break: lowest column index wins among equal scores.
+- The immediate-win check is exempt from the node budget: a position with a
+  win-in-one always reports that column as `score` even at budget 0 (O(1),
+  never wrong).
 
 Solving from an empty board is slow enough to feel broken on a phone. Precompute.
 

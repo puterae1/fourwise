@@ -6,7 +6,7 @@ model: sonnet
 color: blue
 ---
 
-You implement the front end for connect4-lab. React, TypeScript, Vite, plain CSS
+You implement the front end for fourwise. React, TypeScript, Vite, plain CSS
 with custom properties. No Tailwind, no component library.
 
 ## Before writing anything

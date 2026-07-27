@@ -64,7 +64,26 @@
 
 ## In flight
 
-Nothing. No agents running.
+- **Wave 3, engine half** (`rust-engine`): delivered 2026-07-28 — analysis.rs
+  core + budgeted solver + wasm exports + pkg built. Owner gate review:
+  POV test confirmed independent (negated direct child solve); boundary
+  mechanics smoke-tested by running the built module in a worker context
+  (init OK, budget semantics correct at runtime, invalid input throws);
+  mechanics pinned into ENGINE.md (serde-wasm-bindgen JS object, `best`
+  arrives `undefined` → wrapper must normalise to `null`, Uint32Array,
+  lowest-column tie-break, immediate-win exempt from budget). Send-back
+  resolved: empty-board tiny-budget and A→B→A TT-pollution tests added,
+  27 analysis tests green, clippy clean. Engine half ACCEPTED.
+- **Wave 3, web half — COMPLETE 2026-07-28.** Vite + React + TS scaffold,
+  typed wrapper (undefined→null, Uint32Array→number[], EngineError), single
+  wasm-instance worker, progressive-budget client (lazy retryable
+  calibration after a StrictMode double-mount defect was caught in-browser
+  and sent back), honest smoke page. 24 vitest tests against real wasm.
+  Full-wave verifier audit: PASS on all six criteria with line citations.
+  In-browser check (real Web Worker, Chrome): empty board renders honest
+  all-unknown progressive state; endgame position completes with best/
+  scores/threats identical to native and Node results; no console errors.
+  Wave 3 committed as a whole after both checks.
 
 ## Ownership
 
@@ -81,16 +100,16 @@ Nothing. No agents running.
 Reconstructed from `docs/ROADMAP.md` + `docs/ENGINE.md` after the original plan
 text was lost in a context handover. Owner may re-cut these.
 
-- **Wave 2** (`rust-engine`): solver — negamax, alpha-beta, immediate-win /
-  avoid-loss checks, centre-out ordering, transposition table, iterative
-  deepening with null window. Download Pons reference fixtures into
-  `engine/tests/fixtures/` and wire `engine/tests/reference.rs`. Also the
-  engine-side seat proof: colour-independence (negation) and mirror-score
-  tests. Gate contribution: every fixture exact, empty board < 1 s native.
-- **Wave 3** (`rust-engine` then `web-ui`): WASM boundary — wasm-bindgen
-  exports (`analyse` / `best_move` / `legal_moves`), `wasm-pack` build into
-  `web/src/engine/pkg/`, Vite + React scaffold, Web Worker wrapper and typed
-  TS wrapper. `sideToMove` stays `'first' | 'second'`, never a colour.
+- **Wave 3** (`rust-engine` then `web-ui`): WASM boundary per the amended
+  ENGINE.md §WASM boundary (five pinned decisions, 2026-07-28): budgeted
+  `analyse(position, node_budget)` with `ColumnEval` score/full/unknown and
+  `complete` flag; per-column scores from the analysed position's mover's
+  perspective (child score negated); 0-indexed API everywhere, 1-indexed
+  only in position strings; NO `best_move` — levels live in the game layer
+  in TS; persistent module-level TT, one WASM instance per worker; engine
+  clock-free. Then `wasm-pack` build into `web/src/engine/pkg/`, Vite +
+  React scaffold, Web Worker wrapper + typed TS wrapper with time→nodes
+  calibration. `sideToMove` stays `'first' | 'second'`, never a colour.
 - **Wave 4** (`web-ui`; design-lead already done): board rendering per
   `docs/DESIGN-DIRECTION.md`, seat controls, the three modes (Play / Analyse /
   Setup), game state + history. Includes the four-seat-combination test

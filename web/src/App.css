@@ -1,0 +1,190 @@
+/*
+ * Wave 3 smoke page styling. Deliberately minimal: this page exists to
+ * prove the engine/worker/client wiring is honest, not to be the product.
+ * Replaced in Wave 4 by the designed UI (docs/DESIGN-DIRECTION.md).
+ */
+
+.smoke-page {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.smoke-page__note {
+  color: var(--colour-text-dim);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.smoke-page__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: end;
+}
+
+.smoke-page__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 12rem;
+}
+
+.smoke-page__field label {
+  font-size: 0.875rem;
+  color: var(--colour-text-dim);
+}
+
+.smoke-page__field input {
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  min-height: 2.75rem;
+}
+
+.smoke-page__button {
+  background: var(--colour-accent);
+  color: #0a1420;
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  min-height: 2.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.smoke-page__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.smoke-page__error {
+  background: color-mix(in srgb, var(--colour-bad) 18%, var(--colour-surface));
+  border: 1px solid var(--colour-bad);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+}
+
+.smoke-page__status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--colour-unknown);
+  margin: 0;
+}
+
+.smoke-page__status-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--colour-unknown);
+  animation: smoke-page-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes smoke-page-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.smoke-page__result {
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.smoke-page__summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+}
+
+.smoke-page__summary dt {
+  color: var(--colour-text-dim);
+  font-size: 0.8125rem;
+}
+
+.smoke-page__summary dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.smoke-page__columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(4.25rem, 1fr));
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.smoke-page__column {
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.smoke-page__column--best {
+  border-color: var(--colour-good);
+}
+
+.smoke-page__column-label {
+  font-size: 0.75rem;
+  color: var(--colour-text-dim);
+}
+
+.smoke-page__column-kind {
+  font-weight: 600;
+}
+
+/* Colour never carries the verdict alone — each kind also gets a distinct
+ * marker glyph so colour-blind users get the same information. */
+.smoke-page__column-kind--score {
+  color: var(--colour-good);
+}
+.smoke-page__column-kind--score::before {
+  content: '● ';
+}
+
+.smoke-page__column-kind--full {
+  color: var(--colour-text-dim);
+}
+.smoke-page__column-kind--full::before {
+  content: '■ ';
+}
+
+.smoke-page__column-kind--unknown {
+  color: var(--colour-unknown);
+}
+.smoke-page__column-kind--unknown::before {
+  content: '? ';
+}
+
+.smoke-page__threats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}

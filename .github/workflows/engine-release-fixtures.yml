@@ -1,0 +1,36 @@
+name: Engine release fixtures (full solve)
+
+# Manual only, and deliberately not part of ci.yml: this is the full
+# exact-score reference-fixture suite, `cargo test --release --
+# --include-ignored`, which takes roughly 30 minutes. ci.yml runs the fast
+# debug suite on every push instead. Dispatch this on demand whenever the
+# solver or its reference fixtures change and need exact-score
+# verification against the full suite.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  fixtures:
+    runs-on: ubuntu-latest
+    # Observed runtime is ~30 minutes; generous headroom for CI variance
+    # without letting a hang run indefinitely.
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+
+      - name: cargo test --release -- --include-ignored
+        run: cargo test --release -- --include-ignored

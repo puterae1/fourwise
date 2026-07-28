@@ -1,0 +1,106 @@
+name: Deploy to GitHub Pages
+
+# workflow_dispatch ONLY, for now.
+#
+# GitHub Pages is not yet enabled on this repo: it is currently private,
+# and the owner is reviewing the public-repo inventory (docs/STATUS.md,
+# Wave 6b) before flipping visibility and enabling Pages. A push-triggered
+# deploy would fail red on every push to main until that owner step
+# happens, so this stays manual-dispatch-only until then.
+#
+# Once the owner has flipped the repo public and enabled Pages, change the
+# trigger below to (in addition to, or instead of, workflow_dispatch):
+#
+#   on:
+#     push:
+#       branches: [main]
+#
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deployment at a time; never cancel one mid-flight.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (wasm32 target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+
+      # web/src/engine/pkg is generated output (wasm-pack's own
+      # pkg/.gitignore excludes it from the repo), so the deploy must
+      # rebuild it from source rather than trust whatever happens to be
+      # checked out.
+      - name: Build wasm package from source
+        working-directory: engine
+        run: wasm-pack build --target web --out-dir ../web/src/engine/pkg
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: npm ci
+        working-directory: web
+        run: npm ci
+
+      - name: npm test
+        working-directory: web
+        run: npm test
+
+      # GitHub Pages project sites (not user/org sites) serve from
+      # /<repo-name>/, so the production build needs a /fourwise/ base.
+      # web/vite.config.ts sets `base: '/fourwise/'` only when Vite's
+      # `command === 'build'` — local dev (`npm run dev`) and
+      # `vite preview` are unaffected and stay at '/'.
+      #
+      # Verified locally (not just assumed): built dist/ was served from a
+      # tiny static server rooted so dist/ landed under a /fourwise/ path
+      # prefix, then checked with curl. All of the JS entry bundle, the CSS
+      # (including its @font-face url()s), the worker chunk, the wasm
+      # asset, and both self-hosted woff2 fonts resolved with HTTP 200 and
+      # correct Content-Type under /fourwise/... — and 404 without the
+      # prefix, confirming the prefix is load-bearing, not incidental.
+      - name: npm run build (production, /fourwise/ base)
+        working-directory: web
+        run: npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

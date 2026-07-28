@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref so repeated pushes to the same
+# branch don't queue up redundant work.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: engine (cargo test + clippy)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+
+      # Debug profile only. The full `--release -- --include-ignored`
+      # reference-fixture suite (~30 min) is a separate, manually
+      # dispatched workflow (engine-release-fixtures.yml) — not part of
+      # every-push CI.
+      - name: cargo test (debug)
+        run: cargo test
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+  web:
+    name: web (npm test + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # web/src/engine/pkg (the wasm-bindgen output) is build output, not a
+      # committed artifact: wasm-pack writes its own `pkg/.gitignore`
+      # containing `*`, so a fresh checkout does not have it. Both
+      # `npm test` (wasm-test-helper.ts reads the compiled .wasm bytes off
+      # disk) and `npm run build` (wrapper.ts imports the generated JS
+      # glue) need it rebuilt from source before either command can run.
+      - name: Install Rust (wasm32 target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+
+      - name: Build wasm package from source
+        working-directory: engine
+        run: wasm-pack build --target web --out-dir ../web/src/engine/pkg
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: npm ci
+        working-directory: web
+        run: npm ci
+
+      - name: npm test
+        working-directory: web
+        run: npm test
+
+      # Production base is /fourwise/, set conditionally in
+      # web/vite.config.ts (base is '/fourwise/' only when Vite's
+      # `command === 'build'`; `npm run dev` and `vite preview` keep '/').
+      # Verified locally: a built dist/ served under a /fourwise/ path
+      # prefix resolves the JS bundle, CSS, worker chunk, wasm asset, and
+      # both self-hosted fonts with 200s and correct content-types; the
+      # same paths 404 without the prefix.
+      - name: npm run build (production, /fourwise/ base)
+        working-directory: web
+        run: npm run build

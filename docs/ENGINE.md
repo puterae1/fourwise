@@ -225,13 +225,56 @@ interface AnalysisResult {
 There is no `elapsedMs`: the engine is clock-free by design; the worker
 measures wall time itself.
 
-**Score point of view (pin).** Each column `score` is from the perspective of
-the side to move in the ANALYSED position: it is the negation of the child
-position's own score. Positive = playing this column wins for the player
-about to move. Getting this wrong inverts every verdict in the app — the
-exact bug class this project exists to kill, arriving through a different
-door — so tests must assert it directly: a column's entry equals minus the
-solved score of the resulting child position.
+**Score point of view (pin, amended 2026-07-29 — Wave 11).** Each column
+`score` is from the perspective of the side to move in the ANALYSED position.
+**For a NON-TERMINAL child** — one where playing this column does not itself
+complete a four-in-a-row — the entry is the negation of the child position's
+own score (`-solve(child)`, or the negated book lookup, or the negated
+`tactical_search` result, whichever path resolved it). **For a column that
+itself completes four-in-a-row for the mover**, the entry is computed
+DIRECTLY as `22 - stones_the_mover_will_have_played` (the same formula
+`solver.rs`'s own immediate-win short-circuit and `tactical.rs`'s
+`tactical_score` use for a position with `can_win_next() == true`) — it is
+NEVER the negation of a solved, booked, or `tactical_search`-ed child, and
+the child is never played into the solver, the book, or `tactical_search` at
+all for that column.
+
+The negated-child rule and the direct-win rule are not interchangeable, and
+conflating them is a real, shipped defect, not a hypothetical: prior to this
+amendment, both `analysis::analyse_with_book` and
+`tactical::tactical_analyse_with_book` unconditionally computed every
+column as `-solve_budgeted(child)` / `-tactical_search(child, ..)`
+regardless of whether that column's move itself completed four. The
+resulting child in that case is already a terminal, already-decided
+position — handing it to the solver, a book lookup, or `tactical_search`
+violates the precondition every recursive search in this crate relies on
+(that the position handed to it never already contains a just-completed
+alignment for the player who moved into it), and returns a fictional score.
+Confirmed against connect4.gamesolver.org on 2026-07-29: 4 of 20 harness
+positions disagreed with this engine, exclusively in immediate-win columns
+(`docs/STATUS.md`'s "Post-Phase-2 findings" item 4 has the full record). The
+book itself never masked this — a book entry is only ever a non-terminal
+position (see "What is in the book" above), so a winning column always fell
+through to the live (buggy) solve path regardless of book state.
+
+**The original Wave 3 POV test was vacuous for this defect class, and this
+is worth naming explicitly rather than treating as a minor test gap.** The
+test asserted every scored column against `-solve(child)` unconditionally —
+which is exactly the (buggy) rule the implementation itself followed, so the
+test could only ever confirm the implementation matched itself, never catch
+a wrong rule. Compounding this, its fixture positions (`END_EASY`, both deep
+end-game positions) happen to contain ZERO immediate-win columns among their
+legal moves, so even a corrected test using the same fixtures would never
+have exercised the winning-move branch at all. The tactical-module twin of
+that test (`each_scored_column_is_the_negated_direct_tactical_search_of_its_child`)
+had the identical shape of vacuity, for the identical reason. Both are now
+rewritten in `engine/src/analysis.rs` and `engine/src/tactical.rs`
+respectively: winning columns are asserted against an independently
+hand-derived direct score (computed inline in the test from the "22 minus
+stones" formula, not by calling the production code's own helper of the same
+name), and non-terminal columns are asserted against the negated child
+solve/search, using fixtures (`"1264234"`, `"273747"`) confirmed via
+`Position::is_winning_move` to actually contain a winning column.
 
 **Levels (pin).** `best_move(position, level)` is removed from the surface.
 SPEC §3.1's play-strength levels are implemented in the game layer, in

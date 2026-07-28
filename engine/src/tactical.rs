@@ -36,6 +36,26 @@
 //! the two budgeted searches structurally consistent with each other,
 //! which matters because Wave 9's game layer will call both from the same
 //! site under the same cap-expiry logic.
+//!
+//! ## Wave 11 audit note: the same defect class as `analysis.rs`, found here too
+//!
+//! `analysis::analyse_with_book` had a confirmed defect: it scored every
+//! column as `-solve_budgeted(&child)` with no guard for a move that itself
+//! completes four, which solves an already-terminal position and returns a
+//! fictional score (Pons's negamax precondition assumes the position handed
+//! to it never already contains a just-completed alignment for the player
+//! who moved into it). `tactical_analyse_with_book` below had the IDENTICAL
+//! shape of bug: it called `tactical_search(&child, max_ply)` (or a book
+//! lookup) for every legal column with no check for whether that column
+//! itself was the winning move -- empirically reproduced on
+//! `Position::from_moves("273747")` (immediate wins at columns 0 and 4,
+//! `+18` expected from the analysed position's POV; the unguarded code
+//! returned `-18` for both). Fixed the same way -- a guard, using the same
+//! `Position::is_winning_move` per-column check and the same `22 - stones`
+//! direct-score formula, placed before both the book lookup and the
+//! `tactical_search` call. See
+//! `an_immediate_win_column_is_scored_directly_never_searched` below for the
+//! proof.
 
 use serde::Serialize;
 
@@ -206,6 +226,31 @@ pub fn tactical_analyse_with_book(
             columns.push(TacticalEval::Full);
             continue;
         }
+
+        // Wave 11 guard -- the same class of defect `analysis.rs` had, and
+        // the same fix: a column that completes four-in-a-row for `pos`'s
+        // own mover must be scored DIRECTLY, before any book lookup and
+        // before any `tactical_search` of the resulting child. The child of
+        // a winning move is already terminal; `tactical_score`'s own
+        // terminal checks (`can_win_next`, `non_losing_moves() == 0`,
+        // board-full) are all about the position handed TO it, never about
+        // whether the move that reached it already completed an alignment
+        // for the player who is now the "opponent" in that child -- that
+        // precondition is normally maintained by construction during
+        // recursion (a node's own `can_win_next()` check intercepts a
+        // winning move before any child of it is ever created), but this
+        // per-column loop deliberately plays every legal column, including
+        // the winning one, so it must intercept the winning case itself
+        // rather than relying on that recursive invariant. See this
+        // module's `an_immediate_win_column_is_scored_directly_never_searched`
+        // test.
+        if pos.is_winning_move(col) {
+            columns.push(TacticalEval::Score {
+                score: immediate_win_score(pos),
+            });
+            continue;
+        }
+
         let mut child = *pos;
         child.play(col);
 
@@ -273,23 +318,104 @@ mod tests {
         }
     }
 
+    /// Per-column point of view, split by case: a HAND-DERIVED direct score
+    /// for every column that itself completes four-in-a-row, and a negated
+    /// direct `tactical_search` of the resulting child for every
+    /// non-terminal column.
+    ///
+    /// **Provenance note (Wave 11).** The ORIGINAL version of this test
+    /// asserted every scored column against `-tactical_search(child, ..)`
+    /// unconditionally, with no winning-column branch -- the same
+    /// vacuous-rule-mirror shape as `analysis.rs`'s Wave 3 POV test, and
+    /// doubly vacuous here because its fixture (`END_EASY[0]`) contains no
+    /// immediate-win column at all, so the winning-move branch was never
+    /// even reached. This version uses `"273747"` (also a `solver.rs`
+    /// fixture: immediate wins at columns 0 and 4) specifically because it
+    /// DOES contain winning columns, and empirically reproduced the
+    /// tactical-module twin of the analysis.rs defect before the guard in
+    /// `tactical_analyse_with_book` existed: the unguarded code returned
+    /// `-18` for columns 0 and 4 here (negating a `tactical_search` run on
+    /// an already-won child), where `+18` is correct.
     #[test]
-    fn each_scored_column_is_the_negated_direct_tactical_search_of_its_child() {
-        let pos = Position::from_moves(END_EASY[0]).unwrap();
+    fn each_scored_column_is_correct_for_its_case_direct_win_or_negated_child_search() {
+        let pos = Position::from_moves("273747").unwrap();
+        assert!(
+            pos.is_winning_move(0) && pos.is_winning_move(4),
+            "fixture should have immediate wins at columns 0 and 4"
+        );
         let result = tactical_analyse(&pos, TOTAL_CELLS as u32);
         for col in 0..WIDTH {
             if !pos.can_play(col) {
                 assert_eq!(result.columns[col as usize], TacticalEval::Full);
                 continue;
             }
-            let mut child = pos;
-            child.play(col);
-            let direct = tactical_search(&child, TOTAL_CELLS as u32);
-            match result.columns[col as usize] {
-                TacticalEval::Score { score } => assert_eq!(score, -direct),
-                other => panic!("column {col}: expected a Score, got {other:?}"),
+            if pos.is_winning_move(col) {
+                // Hand-derived independently of this module's own
+                // `immediate_win_score` (reusing the function under test
+                // would be tautological): docs/ENGINE.md's convention is
+                // `score = 22 - stones_the_winner_will_have_played`.
+                let expected = 22 - (pos.moves() / 2 + 1) as i32;
+                assert_eq!(
+                    result.columns[col as usize],
+                    TacticalEval::Score { score: expected },
+                    "column {col}: a winning move must score the direct win value, \
+                     never a negated child search"
+                );
+            } else {
+                let mut child = pos;
+                child.play(col);
+                let direct = tactical_search(&child, TOTAL_CELLS as u32);
+                match result.columns[col as usize] {
+                    TacticalEval::Score { score } => assert_eq!(score, -direct),
+                    other => panic!("column {col}: expected a Score, got {other:?}"),
+                }
             }
         }
+    }
+
+    /// This module's `immediate_win_score` must agree with `solver.rs`'s
+    /// own private formula of the same name -- both express the single
+    /// `docs/ENGINE.md` "22 - stones" convention, and must never drift
+    /// apart. `solver.rs`'s formula is private, so the independent proof
+    /// goes through `solver::solve`, which returns exactly that formula's
+    /// value for any position with `can_win_next() == true`.
+    #[test]
+    fn immediate_win_score_agrees_with_the_solvers_own_formula() {
+        for &moves in &["273747", "1264234"] {
+            let pos = Position::from_moves(moves).unwrap();
+            assert!(pos.can_win_next());
+            assert_eq!(immediate_win_score(&pos), solve_free(&pos));
+        }
+    }
+
+    /// The tactical-module twin of `analysis.rs`'s
+    /// `an_immediate_win_column_is_scored_directly_even_under_a_zero_node_budget`:
+    /// a winning column must be resolved directly rather than by running
+    /// `tactical_search` on the (already-terminal) child at all. Proven by
+    /// planting a book entry for the winning column's child that, if the
+    /// guard were bypassed and the book consulted for that column, would
+    /// produce a DIFFERENT (wrong) score than the correct direct win value
+    /// -- the guard must win regardless, because it runs before the book
+    /// lookup entirely.
+    #[test]
+    fn an_immediate_win_column_is_scored_directly_never_searched() {
+        let pos = Position::from_moves("273747").unwrap();
+        assert!(pos.is_winning_move(0));
+
+        let mut child = pos;
+        child.play(0);
+        let wrong_planted_score: i8 = 3; // deliberately NOT the correct direct win value
+        let canon = crate::book::canonical_key(child.key());
+        let book_bytes = build_test_book(8, &[(canon, wrong_planted_score)]);
+        let book = crate::book::Book::load(&book_bytes).unwrap();
+
+        let result = tactical_analyse_with_book(&pos, TOTAL_CELLS as u32, Some(&book));
+        let expected = 22 - (pos.moves() / 2 + 1) as i32;
+        assert_eq!(
+            result.columns[0],
+            TacticalEval::Score { score: expected },
+            "the winning column must ignore the book entirely and score directly"
+        );
     }
 
     #[test]
@@ -552,6 +678,35 @@ mod tests {
         use crate::analysis::{analyse, ColumnEval};
 
         let pos = Position::from_moves(END_EASY[1]).unwrap();
+        let mut solver = Solver::new();
+        let full = analyse(&mut solver, &pos, 1_000_000);
+        let tactical = tactical_analyse(&pos, TOTAL_CELLS as u32);
+
+        for col in 0..WIDTH {
+            match (&full.columns[col as usize], &tactical.columns[col as usize]) {
+                (ColumnEval::Full, TacticalEval::Full) => {}
+                (ColumnEval::Score { score: a }, TacticalEval::Score { score: b }) => {
+                    assert_eq!(a, b, "column {col}: full-analysis score and generous-horizon tactical score must agree");
+                }
+                (a, b) => panic!("column {col}: mismatched shapes {a:?} vs {b:?}"),
+            }
+        }
+    }
+
+    /// Companion to the cross-check above: `END_EASY[1]` has no
+    /// immediate-win column, so it never discriminates the Wave 11 defect
+    /// class (both engines could independently apply the same wrong rule
+    /// to a negated child and still agree with each other). `"273747"` DOES
+    /// have immediate-win columns (0 and 4), so this proves the cross-check
+    /// actually agrees on the winning-column case too, not merely the
+    /// non-terminal one.
+    #[test]
+    fn a_generous_horizon_recommends_a_column_matching_the_full_solver_on_a_fixture_with_an_immediate_win() {
+        use crate::analysis::{analyse, ColumnEval};
+
+        let pos = Position::from_moves("273747").unwrap();
+        assert!(pos.is_winning_move(0) && pos.is_winning_move(4));
+
         let mut solver = Solver::new();
         let full = analyse(&mut solver, &pos, 1_000_000);
         let tactical = tactical_analyse(&pos, TOTAL_CELLS as u32);

@@ -14,3 +14,7 @@ serde-wasm-bindgen = "0.6"
 [[bin]]
 name = "gen_book"
 path = "../tools/gen_book.rs"
+
+[[bin]]
+name = "compare_gamesolver"
+path = "../tools/compare_gamesolver.rs"

@@ -169,6 +169,27 @@ impl Position {
         winning_positions(self.current, self.mask) & self.possible() != 0
     }
 
+    /// Whether playing `col` (0-indexed) right now would itself complete a
+    /// four-in-a-row for the player about to move -- a per-column
+    /// refinement of `can_win_next` (which only answers "does *some*
+    /// column win", not "does *this* column win").
+    ///
+    /// Needed by `analysis::analyse_with_book` and
+    /// `tactical::tactical_analyse_with_book`, both of which must score a
+    /// winning column DIRECTLY and must never solve or book-look-up the
+    /// position that results from playing it: the position after an
+    /// already-winning move is terminal, and handing a terminal position
+    /// to the searcher (or treating it as an ordinary book key) violates
+    /// the precondition every recursive search in this crate relies on --
+    /// that a position handed to it never already contains a
+    /// just-completed alignment for the player who moved into it. Callers
+    /// must check `can_play(col)` first; a full column's `possible()` bit
+    /// is already zero, so this returns `false` for it regardless.
+    pub(crate) fn is_winning_move(&self, col: u32) -> bool {
+        let landing = self.possible() & column_mask(col);
+        winning_positions(self.current, self.mask) & landing != 0
+    }
+
     /// Bitmask of candidate moves for the player to move that do not hand
     /// the opponent an immediate winning reply.
     ///

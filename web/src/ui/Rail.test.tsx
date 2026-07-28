@@ -121,6 +121,54 @@ describe('Rail — verdicts section', () => {
   });
 });
 
+describe('Rail — terminal display (SPEC §3.2 amendment: outcome beats "still solving")', () => {
+  it('replaces every row with the terminal outcome, never "Still solving" anywhere, even with a non-null translated prop still attached', () => {
+    render(
+      <Rail
+        translated={TRANSLATED}
+        showVerdicts
+        revealed={false}
+        moveListEntries={[]}
+        currentPly={0}
+        onJump={() => {}}
+        terminal={{ kind: 'win', sentence: 'Game over — you won.' }}
+      />,
+    );
+    expect(screen.queryByText(/still solving/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText('Game over — you won.')).toHaveLength(7);
+  });
+
+  it('reports a draw outcome identically across all seven columns', () => {
+    render(
+      <Rail
+        translated={null}
+        showVerdicts
+        revealed={false}
+        moveListEntries={[]}
+        currentPly={0}
+        onJump={() => {}}
+        terminal={{ kind: 'draw', sentence: 'Game over — drawn.' }}
+      />,
+    );
+    expect(screen.getAllByText('Game over — drawn.')).toHaveLength(7);
+    expect(screen.queryByText('Column is full.')).not.toBeInTheDocument();
+  });
+
+  it('without a terminal prop (the default), behaviour is completely unchanged -- "still solving" still renders normally', () => {
+    render(
+      <Rail
+        translated={{ position: null, best: null, complete: false, columns: Array.from({ length: 7 }, () => ({ kind: 'unknown' as const })) }}
+        showVerdicts
+        revealed={false}
+        moveListEntries={[]}
+        currentPly={0}
+        onJump={() => {}}
+      />,
+    );
+    expect(screen.getAllByText('Still solving this column.')).toHaveLength(7);
+  });
+});
+
 describe('Rail — move list', () => {
   it('renders every entry inline (no click needed to open it) and marks the current ply', () => {
     render(

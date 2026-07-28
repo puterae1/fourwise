@@ -200,6 +200,101 @@ describe('AnalysePanel — best highlight stays behind the Show me gate', () => 
   });
 });
 
+describe('AnalysePanel — terminal display (SPEC §3.2 amendment: outcome beats "still solving")', () => {
+  it('shows the outcome in every cell, never "Still solving this column." once the game is terminal', () => {
+    const translated: TranslatedAnalysis = {
+      position: null,
+      best: null,
+      complete: false,
+      columns: Array.from({ length: 7 }, () => ({ kind: 'unknown' as const })),
+    };
+
+    render(
+      <AnalysePanel
+        translated={translated}
+        rawColumns={null}
+        revealed={false}
+        selected={null}
+        onSelect={noop}
+        onShowMe={noop}
+        rawScoresOn={false}
+        onToggleRawScores={noop}
+        terminal={{ kind: 'win', sentence: 'Game over — you won.' }}
+      />,
+    );
+
+    expect(screen.queryByText(/still solving/i)).not.toBeInTheDocument();
+    for (let i = 1; i <= 7; i++) {
+      const cell = screen.getByRole('button', { name: new RegExp(`^Column ${i}\\.`) });
+      expect(cell).toHaveAccessibleName(`Column ${i}. Game over — you won.`);
+      expect(cell).toHaveAttribute('data-kind', 'win');
+      expect(within(cell).getByText('won')).toBeInTheDocument();
+    }
+  });
+
+  it('a drawn game shows "drawn" (not the in-progress "draw" label) in every cell', () => {
+    render(
+      <AnalysePanel
+        translated={null}
+        rawColumns={null}
+        revealed={false}
+        selected={null}
+        onSelect={noop}
+        onShowMe={noop}
+        rawScoresOn={false}
+        onToggleRawScores={noop}
+        terminal={{ kind: 'draw', sentence: 'Game over — drawn.' }}
+      />,
+    );
+    expect(screen.getAllByText('drawn')).toHaveLength(7);
+  });
+
+  it('never inverts a stale "best" highlight once terminal, even if `best`/`revealed` still point at a pre-game-over column', () => {
+    const translated: TranslatedAnalysis = {
+      position: null,
+      best: 0,
+      complete: true,
+      columns: [verdictColumn('win', 5), { kind: 'unknown' }, { kind: 'unknown' }, { kind: 'unknown' }, { kind: 'unknown' }, { kind: 'unknown' }, { kind: 'unknown' }],
+    };
+    render(
+      <AnalysePanel
+        translated={translated}
+        rawColumns={null}
+        revealed
+        selected={null}
+        onSelect={noop}
+        onShowMe={noop}
+        rawScoresOn={false}
+        onToggleRawScores={noop}
+        terminal={{ kind: 'loss', sentence: 'Game over — she won.' }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /^Column 1\./ })).toHaveAttribute('data-invert', 'false');
+  });
+
+  it('without a terminal prop (the default), a non-terminal position renders exactly as before', () => {
+    const translated: TranslatedAnalysis = {
+      position: null,
+      best: null,
+      complete: false,
+      columns: Array.from({ length: 7 }, () => ({ kind: 'unknown' as const })),
+    };
+    render(
+      <AnalysePanel
+        translated={translated}
+        rawColumns={null}
+        revealed={false}
+        selected={null}
+        onSelect={noop}
+        onShowMe={noop}
+        rawScoresOn={false}
+        onToggleRawScores={noop}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /^Column 1\./ })).toHaveAccessibleName('Column 1. Still solving this column.');
+  });
+});
+
 describe('AnalysePanel — quiet "slower than best" note', () => {
   it('never appears before reveal, even for a win column slower than the best', () => {
     const columns: TranslatedAnalysis['columns'] = [

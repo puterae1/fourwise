@@ -1,7 +1,15 @@
-import { describe, expect, it } from 'vitest';
-import { analyseProgressive, budgetSteps, calibrate, createEngineClient, type AnalyseTransport, type Clock } from './client.js';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  analyseProgressive,
+  budgetSteps,
+  calibrate,
+  createEngineClient,
+  fetchAndLoadBook,
+  type AnalyseTransport,
+  type Clock,
+} from './client.js';
 import { EngineError } from './wrapper.js';
-import type { AnalysisResult } from './types.js';
+import type { AnalysisResult, BookLoadResult, TacticalAnalysis } from './types.js';
 
 // These tests exercise only the worker-independent parts of client.ts —
 // budget escalation and calibration — against a fake transport. worker.ts
@@ -24,6 +32,14 @@ interface FakeCall {
   nodeBudget: number;
 }
 
+// Book/tactical-fallback methods are not exercised by `analyseProgressive`/
+// `calibrate` at all -- these two stubs throw if ever accidentally called,
+// exactly like the `analyse` guard the blunder/lamp controller-test fakes
+// already use for methods outside a given test's scope.
+function notUsedHere(name: string): never {
+  throw new Error(`${name}() is not used by this test`);
+}
+
 function makeFakeTransport(
   results: AnalysisResult[],
 ): AnalyseTransport & { calls: FakeCall[] } {
@@ -37,6 +53,15 @@ function makeFakeTransport(
         throw new Error(`fake transport received more calls (${calls.length}) than scripted results`);
       }
       return result;
+    },
+    async tacticalFallback() {
+      return notUsedHere('tacticalFallback');
+    },
+    async loadBook() {
+      return notUsedHere('loadBook');
+    },
+    async setBookEnabled() {
+      return notUsedHere('setBookEnabled');
     },
     terminate() {},
   };
@@ -69,6 +94,15 @@ function makeControllableTransport(): AnalyseTransport & {
       return new Promise<AnalysisResult>((resolve, reject) => {
         pending.push({ resolve, reject });
       });
+    },
+    async tacticalFallback() {
+      return notUsedHere('tacticalFallback');
+    },
+    async loadBook() {
+      return notUsedHere('loadBook');
+    },
+    async setBookEnabled() {
+      return notUsedHere('setBookEnabled');
     },
     settleNext(result: AnalysisResult) {
       const entry = pending.shift();
@@ -318,5 +352,228 @@ describe('createEngineClient', () => {
     client.terminate();
 
     await expect(client.analyse('', 100)).rejects.toThrow(EngineError);
+  });
+
+  it('forwards tacticalFallback and setBookEnabled straight to the transport (Wave 9 passthrough)', async () => {
+    const tactical: TacticalAnalysis = {
+      columns: Array.from({ length: 7 }, () => ({ kind: 'score' as const, score: 0 })),
+      best: 3,
+    };
+    const transport: AnalyseTransport = {
+      analyse: async () => notUsedHere('analyse'),
+      tacticalFallback: vi.fn(async (position: string, maxPly: number) => {
+        expect(position).toBe('44');
+        expect(maxPly).toBe(7);
+        return tactical;
+      }),
+      loadBook: async () => notUsedHere('loadBook'),
+      setBookEnabled: vi.fn(async (enabled: boolean) => {
+        expect(enabled).toBe(false);
+      }),
+      terminate() {},
+    };
+    const client = createEngineClient(() => transport);
+
+    const result = await client.tacticalFallback('44', 7);
+    expect(result).toBe(tactical);
+    expect(transport.tacticalFallback).toHaveBeenCalledTimes(1);
+
+    await client.setBookEnabled(false);
+    expect(transport.setBookEnabled).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('fetchAndLoadBook', () => {
+  function makeLoadBookTransport(result: BookLoadResult): AnalyseTransport & { calls: Uint8Array[] } {
+    const calls: Uint8Array[] = [];
+    return {
+      analyse: async () => notUsedHere('analyse'),
+      tacticalFallback: async () => notUsedHere('tacticalFallback'),
+      async loadBook(bytes: Uint8Array) {
+        calls.push(bytes);
+        return result;
+      },
+      setBookEnabled: async () => notUsedHere('setBookEnabled'),
+      terminate() {},
+      calls,
+    };
+  }
+
+  function okFetch(bytes: Uint8Array): typeof fetch {
+    return (async () =>
+      new Response(bytes as unknown as BodyInit, { status: 200 })) as unknown as typeof fetch;
+  }
+
+  it('fetches book.bin under the given BASE_URL and hands the bytes to loadBook', async () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    const okResult: BookLoadResult = { ok: true, entries: 10, depth: 8, error: null };
+    const transport = makeLoadBookTransport(okResult);
+    let requestedUrl = '';
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      requestedUrl = String(input);
+      return new Response(bytes as unknown as BodyInit, { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const result = await fetchAndLoadBook(transport, fetchImpl, '/fourwise/');
+
+    expect(requestedUrl).toBe('/fourwise/book.bin');
+    expect(result).toEqual(okResult);
+    expect(transport.calls).toHaveLength(1);
+    expect(Array.from(transport.calls[0]!)).toEqual([1, 2, 3]);
+  });
+
+  it('never hardcodes the unprefixed path either -- BASE_URL "/" produces "/book.bin"', async () => {
+    const transport = makeLoadBookTransport({ ok: true, entries: 1, depth: 8, error: null });
+    let requestedUrl = '';
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      requestedUrl = String(input);
+      return new Response(new Uint8Array([1]), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    await fetchAndLoadBook(transport, fetchImpl, '/');
+    expect(requestedUrl).toBe('/book.bin');
+  });
+
+  it('rejects on a network-level fetch failure (fetchImpl throws)', async () => {
+    const transport = makeLoadBookTransport({ ok: true, entries: 1, depth: 8, error: null });
+    const fetchImpl = (async () => {
+      throw new TypeError('network down');
+    }) as unknown as typeof fetch;
+
+    await expect(fetchAndLoadBook(transport, fetchImpl, '/')).rejects.toThrow(EngineError);
+    expect(transport.calls).toHaveLength(0); // never reached loadBook
+  });
+
+  it('rejects on an HTTP error status -- the CURRENT live state, since book.bin does not exist yet', async () => {
+    const transport = makeLoadBookTransport({ ok: true, entries: 1, depth: 8, error: null });
+    const fetchImpl = (async () => new Response(null, { status: 404 })) as unknown as typeof fetch;
+
+    await expect(fetchAndLoadBook(transport, fetchImpl, '/')).rejects.toThrow(/404/);
+    expect(transport.calls).toHaveLength(0);
+  });
+
+  it('does NOT reject on a validation rejection (corrupt bytes) -- resolves with the honest ok:false instead', async () => {
+    const corrupt: BookLoadResult = { ok: false, entries: 0, depth: 0, error: 'header too short' };
+    const transport = makeLoadBookTransport(corrupt);
+    const result = await fetchAndLoadBook(transport, okFetch(new Uint8Array([9])), '/');
+    expect(result).toEqual(corrupt);
+  });
+});
+
+describe('EngineClient.loadBookFromNetwork -- single-flight, retryable, no re-fetch loop', () => {
+  function controllableFetch(): {
+    fetchImpl: typeof fetch;
+    calls: number;
+    settleNext: (status: number, bytes?: Uint8Array) => void;
+    rejectNext: (err: Error) => void;
+  } {
+    const pending: Array<{ resolve: (r: Response) => void; reject: (e: Error) => void }> = [];
+    let calls = 0;
+    const fetchImpl = (() => {
+      calls++;
+      return new Promise<Response>((resolve, reject) => pending.push({ resolve, reject }));
+    }) as unknown as typeof fetch;
+    return {
+      fetchImpl,
+      get calls() {
+        return calls;
+      },
+      settleNext(status: number, bytes: Uint8Array = new Uint8Array([1])) {
+        const entry = pending.shift();
+        if (!entry) throw new Error('settleNext called with no pending fetch');
+        entry.resolve(new Response(bytes as unknown as BodyInit, { status }));
+      },
+      rejectNext(err: Error) {
+        const entry = pending.shift();
+        if (!entry) throw new Error('rejectNext called with no pending fetch');
+        entry.reject(err);
+      },
+    };
+  }
+
+  function transportWithLoadBook(result: BookLoadResult): AnalyseTransport {
+    return {
+      analyse: async () => notUsedHere('analyse'),
+      tacticalFallback: async () => notUsedHere('tacticalFallback'),
+      loadBook: async () => result,
+      setBookEnabled: async () => notUsedHere('setBookEnabled'),
+      terminate() {},
+    };
+  }
+
+  it('concurrent callers before the fetch resolves share exactly one in-flight fetch (single-flight)', async () => {
+    const control = controllableFetch();
+    const transport = transportWithLoadBook({ ok: true, entries: 5, depth: 8, error: null });
+    const client = createEngineClient(() => transport, { fetchImpl: control.fetchImpl, baseUrl: '/' });
+
+    const first = client.loadBookFromNetwork();
+    const second = client.loadBookFromNetwork();
+    expect(control.calls).toBe(1); // only one fetch issued for both callers
+
+    control.settleNext(200);
+    const [a, b] = await Promise.all([first, second]);
+    expect(a).toEqual(b);
+  });
+
+  it('a failed attempt (network error) resolves silently to a rejection the caller controls, and clears the cache so a later call retries', async () => {
+    const control = controllableFetch();
+    const transport = transportWithLoadBook({ ok: true, entries: 5, depth: 8, error: null });
+    const client = createEngineClient(() => transport, { fetchImpl: control.fetchImpl, baseUrl: '/' });
+
+    const first = client.loadBookFromNetwork();
+    control.rejectNext(new TypeError('network down'));
+    await expect(first).rejects.toThrow(EngineError);
+
+    // Retryable: a later explicit call issues a genuinely NEW fetch, not the
+    // same rejected promise forever.
+    const second = client.loadBookFromNetwork();
+    expect(control.calls).toBe(2);
+    control.settleNext(200);
+    await expect(second).resolves.toEqual({ ok: true, entries: 5, depth: 8, error: null });
+  });
+
+  it('an HTTP 404 (book.bin absent -- the live state of this wave) rejects, and nothing here retries automatically (no loop)', async () => {
+    const control = controllableFetch();
+    const transport = transportWithLoadBook({ ok: true, entries: 5, depth: 8, error: null });
+    const client = createEngineClient(() => transport, { fetchImpl: control.fetchImpl, baseUrl: '/' });
+
+    const attempt = client.loadBookFromNetwork();
+    control.settleNext(404);
+    await expect(attempt).rejects.toThrow(EngineError);
+
+    // Nothing automatically re-issued a second fetch -- exactly one call was
+    // made for the one `loadBookFromNetwork()` invocation above.
+    expect(control.calls).toBe(1);
+  });
+
+  it('a validation rejection (corrupt book) resolves normally with ok:false -- never a thrown/rejected promise', async () => {
+    const control = controllableFetch();
+    const transport = transportWithLoadBook({ ok: false, entries: 0, depth: 0, error: 'bad header' });
+    const client = createEngineClient(() => transport, { fetchImpl: control.fetchImpl, baseUrl: '/' });
+
+    const attempt = client.loadBookFromNetwork();
+    control.settleNext(200);
+    await expect(attempt).resolves.toEqual({ ok: false, entries: 0, depth: 0, error: 'bad header' });
+  });
+
+  it('each client is independent -- one client\'s failed book load never poisons another client\'s attempt', async () => {
+    const controlA = controllableFetch();
+    const controlB = controllableFetch();
+    const clientA = createEngineClient(() => transportWithLoadBook({ ok: true, entries: 1, depth: 8, error: null }), {
+      fetchImpl: controlA.fetchImpl,
+      baseUrl: '/',
+    });
+    const clientB = createEngineClient(() => transportWithLoadBook({ ok: true, entries: 2, depth: 8, error: null }), {
+      fetchImpl: controlB.fetchImpl,
+      baseUrl: '/',
+    });
+
+    const attemptA = clientA.loadBookFromNetwork();
+    controlA.rejectNext(new TypeError('A network down'));
+    await expect(attemptA).rejects.toThrow(EngineError);
+
+    const attemptB = clientB.loadBookFromNetwork();
+    controlB.settleNext(200);
+    await expect(attemptB).resolves.toEqual({ ok: true, entries: 2, depth: 8, error: null });
   });
 });

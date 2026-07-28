@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useEngineClient } from './useEngineClient.js';
+import { useBookLoad } from './useBookLoad.js';
 import { useGameController, opponentColourOf } from './useGameController.js';
 import { useSetupEditor } from './useSetupEditor.js';
 import { SeatControls } from './SeatControls.js';
@@ -29,7 +30,9 @@ import {
   namedColumnSentence,
   namedColumnUnknown,
   positionSummary,
+  terminalOutcome,
   turnContextLine,
+  type TerminalOutcome,
 } from './copy.js';
 import { userMovesFirst, type Seat } from '../game/seat.js';
 import type { GameState } from '../game/gameState.js';
@@ -75,6 +78,13 @@ function selectedColumnSentence(index: number, translated: TranslatedAnalysis | 
 function App() {
   const client = useEngineClient();
   const viewportWidth = useViewportWidth();
+
+  // Wave 9: fetches and loads the opening book, entirely off the critical
+  // render path -- see `useBookLoad.ts`'s own doc comment. Started as soon
+  // as a client exists (same moment `SeatPrompt.tsx` warms calibration),
+  // well before the first-run prompt's Start button, so it is already
+  // in flight (or resolved) by the time a real game exists to analyse.
+  useBookLoad(client);
 
   // First-run seat prompt (owner ruling, SPEC.md §1/§5): read once at
   // mount, never defaulted. A stored seat here means `useGameController`
@@ -226,6 +236,12 @@ function App() {
   let contextLine: string | undefined;
   let sentence: string;
   let variant: 'default' | 'error' | 'blunder' = 'default';
+  // SPEC §3.2's terminal-display amendment -- computed once here (Setup
+  // excluded, same as the headline's own `isGameOver` branch below: freely
+  // placing discs isn't a finished game) and handed to both `Rail` and
+  // `AnalysePanel`, which otherwise show a per-column verdict/pending state
+  // that has nothing left to mean once the game has actually ended.
+  let terminal: TerminalOutcome | null = null;
 
   if (controller.mode === 'setup') {
     if (setup.rejection) {
@@ -238,6 +254,7 @@ function App() {
     const winner = controller.board.winLine?.colour ?? null;
     const winnerControl = winner ? controller.controls[winner] : 'human';
     sentence = gameOverHeadline(controller.seat, winner, winnerControl);
+    terminal = terminalOutcome(controller.seat, winner, winnerControl);
   } else if (controller.mode === 'play') {
     if (controller.blunder) {
       // SPEC §3.2's blunder flag replaces the normal headline for as long as
@@ -356,6 +373,7 @@ function App() {
                 onControlChange={controller.setControl}
                 levels={controller.levels}
                 onLevelChange={controller.setLevel}
+                levelQualifiers={controller.levelQualifiers}
                 onUndo={controller.undo}
                 onRedo={controller.redo}
                 canUndo={controller.canUndo}
@@ -372,6 +390,7 @@ function App() {
                 onShowMe={controller.showBest}
                 rawScoresOn={controller.rawScoresOn}
                 onToggleRawScores={() => controller.setRawScoresOn(!controller.rawScoresOn)}
+                terminal={terminal}
               />
             )}
             {controller.mode === 'setup' && (
@@ -398,6 +417,7 @@ function App() {
             moveListEntries={controller.moveListEntries}
             currentPly={controller.game.currentPly}
             onJump={controller.jumpToPly}
+            terminal={terminal}
           />
         )}
       </div>

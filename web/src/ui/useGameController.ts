@@ -30,13 +30,21 @@ import { parseImportFile, toGameState } from '../game/exportFormat.js';
 import { colourAtPly, otherColour, type Colour, type Seat } from '../game/seat.js';
 import type { Grid } from '../game/setup.js';
 import { translateAnalysis, translateScore, type TranslatedAnalysis, type VerdictKind } from '../game/verdict.js';
-import { LEVEL_THINK_MS, pickEngineMove, type Level } from '../game/levels.js';
+import {
+  centreMostMove,
+  LEVEL_THINK_MS,
+  pickEngineMove,
+  pickEngineMoveFromTactical,
+  TACTICAL_HORIZON_PLY,
+  type Level,
+  type LevelMove,
+} from '../game/levels.js';
 import { AnalysisSession } from '../game/analysisSession.js';
 import type { AnalysisResult } from '../engine/types.js';
 import type { Calibration, EngineClient } from '../engine/client.js';
 import { deriveBoard, type BoardDerivation } from './deriveBoard.js';
 import { checkForBlunder, type BlunderInput } from './blunderCheck.js';
-import { defaultControls, type Controls, type Levels, type SideControl } from './types.js';
+import { defaultControls, type Controls, type LevelQualifier, type Levels, type SideControl } from './types.js';
 
 const ANALYSE_THINK_MS = 3000;
 const AUTO_REVEAL_THINK_MS = 2000;
@@ -70,6 +78,9 @@ export interface GameController {
   setControl: (colour: Colour, value: SideControl) => void;
   levels: Levels;
   setLevel: (colour: Colour, value: Level) => void;
+  /** SPEC §3.1's amended "Level-label honesty" -- see `LevelQualifier`'s own
+   *  doc comment. Keyed by colour, mirroring `controls`/`levels`. */
+  levelQualifiers: Record<Colour, LevelQualifier>;
 
   play: (column: number) => void;
   undo: () => void;
@@ -128,6 +139,15 @@ export interface GameController {
    * a failure returns the exact honest message `exportFormat.ts` produced,
    * one of the three distinct failure modes (SPEC §5 amendment). */
   importGame: (fileText: string) => { ok: true } | { ok: false; message: string };
+}
+
+/** Converts a chosen engine move into `playMove`'s `options` -- the one
+ * place `LevelMove.origin === 'complete'` becomes "no `partial`/`origin` at
+ * all" (matches a human move's own shape exactly), so a complete engine move
+ * is indistinguishable in storage from a human one, as it always has been. */
+function engineMovePlayOptions(chosen: LevelMove): { partial?: boolean; origin?: 'tactical' | 'centre-fallback' } {
+  if (chosen.origin === 'complete') return {};
+  return { partial: true, origin: chosen.origin };
 }
 
 // No fixed default seat (owner ruling, see `SeatPrompt.tsx`): a hardcoded
@@ -402,10 +422,31 @@ export function useGameController(
       }
 
       if (activeGame.mode === 'play' && moverControl === 'engine') {
-        const chosen = pickEngineMove(tokened.result, ply, levels[mover]);
+        const level = levels[mover];
+        let chosen: LevelMove;
+        if (tokened.result.complete) {
+          chosen = pickEngineMove(tokened.result, ply, level);
+        } else {
+          // SPEC §3.1a's post-gate amendment: cap expired without a
+          // complete analysis -- call the COMPLETE, ply-bounded
+          // `tacticalFallback` search instead of restricting the level rule
+          // to a partial deep search's unevenly-solved columns (the
+          // superseded rule; a partial DEEP search missed a trivial tactic
+          // a complete SHALLOW one would have caught). Falls back to the
+          // centre-most legal column only if the tactical call itself
+          // cannot run at all.
+          try {
+            const tactical = await client.tacticalFallback(position, TACTICAL_HORIZON_PLY[level]);
+            if (cancelled) return; // position moved on while tacticalFallback was in flight
+            chosen = pickEngineMoveFromTactical(tactical, ply, tokened.result.sideToMove, level);
+          } catch {
+            if (cancelled) return;
+            chosen = centreMostMove(legalColumns(activeGame));
+          }
+        }
         setGame((g) => {
           if (!g || enginePosition(g) !== position) return g; // position moved on already -- discard
-          const result = playMove(g, chosen.column, { partial: chosen.partial });
+          const result = playMove(g, chosen.column, engineMovePlayOptions(chosen));
           return result.ok ? result.state : g;
         });
       }
@@ -504,6 +545,26 @@ export function useGameController(
     [effectiveGame.moves, effectiveGame.setupPrefix, seat],
   );
 
+  // SPEC §3.1's amended "Level-label honesty" -- the LAST move actually made
+  // by each colour, within the currently-VISIBLE position (`currentPly`
+  // respected: undo/jump make a later move invisible again, same as
+  // `moveListEntries`' own history scope). Iterating in ply order and
+  // overwriting per colour means the most recent move for that colour always
+  // wins; a later COMPLETE move (no `origin`) correctly clears an earlier
+  // qualifier. A move flagged `partial` but missing `origin` (possible only
+  // via an imported/restored game from before this field existed) defaults
+  // to `'tactical'`, the less severe/more common of the two -- an
+  // unspecified-but-honest qualifier, never a silently-dropped one.
+  const levelQualifiers: Record<Colour, LevelQualifier> = useMemo(() => {
+    const result: Record<Colour, LevelQualifier> = { red: null, yellow: null };
+    const visible = effectiveGame.moves.slice(0, effectiveGame.currentPly);
+    visible.forEach((m, i) => {
+      const colour = colourAtPly(seat, effectiveGame.setupPrefix.length + i);
+      result[colour] = m.partial ? (m.origin ?? 'tactical') : null;
+    });
+    return result;
+  }, [effectiveGame.moves, effectiveGame.currentPly, effectiveGame.setupPrefix, seat]);
+
   // `blunder` is stale the instant the position moves on (a further move,
   // undo, redo or jump) -- keying by `positionKey` rather than clearing it
   // imperatively means every one of those already invalidates it for free.
@@ -566,6 +627,7 @@ export function useGameController(
     setControl,
     levels,
     setLevel,
+    levelQualifiers,
     play,
     undo,
     redo,

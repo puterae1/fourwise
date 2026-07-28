@@ -11,7 +11,7 @@
 
 import type { TranslatedAnalysis, VerdictKind } from '../game/verdict.js';
 import type { ColumnEval } from '../engine/types.js';
-import { capitalize } from './copy.js';
+import { capitalize, type TerminalOutcome } from './copy.js';
 import './AnalysePanel.css';
 
 const MAX_OWN_MOVE_DISTANCE = 21; // 42-square board, halved
@@ -35,6 +35,11 @@ export function columnThrowsAwayWin(positionKind: VerdictKind | null, columnKind
   return positionKind === 'win' && columnKind !== 'win';
 }
 
+// SPEC §3.2 terminal-display amendment: a short, honest word per outcome --
+// never a fabricated distance number (CLAUDE.md "no placeholder data"; once
+// the game is over there is no "moves until" left to report).
+const TERMINAL_NUMERAL: Record<VerdictKind, string> = { win: 'won', loss: 'lost', draw: 'drawn' };
+
 export interface AnalysePanelProps {
   translated: TranslatedAnalysis | null;
   rawColumns: ColumnEval[] | null;
@@ -44,6 +49,11 @@ export interface AnalysePanelProps {
   onShowMe: () => void;
   rawScoresOn: boolean;
   onToggleRawScores: () => void;
+  /** SPEC §3.2's terminal-display amendment (default `null`, i.e. no change
+   * for a non-terminal position): when set, every cell reports this outcome
+   * instead of the normal per-column verdict/pending state -- never "Still
+   * solving this column." once the game has actually ended. */
+  terminal?: TerminalOutcome | null;
 }
 
 export function AnalysePanel({
@@ -55,6 +65,7 @@ export function AnalysePanel({
   onShowMe,
   rawScoresOn,
   onToggleRawScores,
+  terminal = null,
 }: AnalysePanelProps) {
   const columns = Array.from({ length: 7 }, (_, i) => i);
   const best = translated?.best ?? null;
@@ -72,7 +83,10 @@ export function AnalysePanel({
         {columns.map((index) => {
           const column = translated?.columns[index];
           const raw = rawColumns?.[index];
-          const inverted = revealed && best === index;
+          // No stale "best" highlight once the game is over -- `best`/
+          // `revealed` describe a position from BEFORE the final move, not
+          // this terminal one (SPEC §3.2 terminal-display amendment).
+          const inverted = !terminal && revealed && best === index;
           const isSelected = selected === index;
 
           let kind: 'full' | 'unknown' | 'win' | 'draw' | 'loss' = 'unknown';
@@ -82,7 +96,12 @@ export function AnalysePanel({
           let throwsAwayWin = false;
           let slowerThanBest = false;
 
-          if (!column || column.kind === 'unknown') {
+          if (terminal) {
+            kind = terminal.kind;
+            numeral = TERMINAL_NUMERAL[terminal.kind];
+            heightPct = terminal.kind === 'draw' ? 40 : 100;
+            sentenceForAria = terminal.sentence;
+          } else if (!column || column.kind === 'unknown') {
             kind = 'unknown';
           } else if (column.kind === 'full') {
             kind = 'full';
@@ -139,7 +158,7 @@ export function AnalysePanel({
               </span>
               <span className="verdict-cell__column-number">{index + 1}</span>
               <span className="verdict-cell__numeral">
-                {kind === 'draw' ? 'draw' : numeral}
+                {terminal ? numeral : kind === 'draw' ? 'draw' : numeral}
               </span>
               {throwsAwayWin && <span className="verdict-cell__flag">threw away win</span>}
               {slowerThanBest && <span className="verdict-cell__note">slower than best</span>}

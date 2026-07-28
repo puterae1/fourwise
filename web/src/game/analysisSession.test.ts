@@ -42,6 +42,15 @@ function makeControllableTransport(): AnalyseTransport & {
       if (!resolve) throw new Error(`no pending call at index ${callIndex}`);
       resolve(result);
     },
+    async tacticalFallback() {
+      throw new Error('tacticalFallback() is not used by this test');
+    },
+    async loadBook() {
+      throw new Error('loadBook() is not used by this test');
+    },
+    async setBookEnabled() {
+      throw new Error('setBookEnabled() is not used by this test');
+    },
     terminate() {},
   };
 }

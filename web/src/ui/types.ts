@@ -21,6 +21,14 @@ export interface Levels {
   yellow: Level;
 }
 
+/** SPEC §3.1's amended "Level-label honesty": `null` when the last move
+ *  made by this colour came from the level's own complete computation;
+ *  otherwise the specific reason it didn't, for the level label's own
+ *  surface (`PlayPanel.tsx`) to qualify visibly -- the move list's
+ *  `partial` badge is "necessary but not sufficient" per the amendment.
+ *  Computed by `useGameController.ts`'s `levelQualifiers`. */
+export type LevelQualifier = 'tactical' | 'centre-fallback' | null;
+
 /**
  * The role-based default for a brand-new game (Wave 6a fix): the user's own
  * colour starts under human control, the opponent's colour starts under

@@ -87,3 +87,45 @@ export function blunderSentence(beforeKind: VerdictKind, bestColumn: number): st
   const clause = beforeKind === 'draw' ? 'That threw away the draw.' : 'That threw away a win.';
   return `${clause} Column ${bestColumn + 1} held it.`;
 }
+
+/**
+ * The finished-game outcome, from the user's seat (SPEC §1) — SPEC §3.2's
+ * terminal-display amendment: "when the position is terminal, the
+ * per-column analysis reports the game's outcome ('game over — you won' /
+ * '—drawn'), never 'still solving'". `Rail.tsx`/`AnalysePanel.tsx` consume
+ * this instead of their normal per-column `TranslatedColumn` rendering once
+ * the board is terminal — one seat-translated fact, not seven stale
+ * "still solving" rows under a headline that already says the game is over.
+ *
+ * `kind` reuses `VerdictKind` ('win'/'draw'/'loss') so the two consuming
+ * components can keep their EXISTING win/draw/loss bar styling (solid /
+ * hatched / outline) with zero new CSS — a resolved outcome and an
+ * in-progress win/draw/loss verdict are visually the same FAMILY of fact,
+ * just phrased in the past tense here.
+ */
+export interface TerminalOutcome {
+  kind: VerdictKind;
+  sentence: string;
+}
+
+/**
+ * @param seat           The viewer's seat (SPEC §1: translation happens
+ *                        exactly once, here, from the raw winner colour).
+ * @param winner          The winning colour, or `null` for a draw.
+ * @param winnerControl   How the winning side was controlled — distinguishes
+ *                        "the engine won" from "she won", mirroring
+ *                        `gameOverHeadline`'s own branching exactly.
+ */
+export function terminalOutcome(seat: Seat, winner: Colour | null, winnerControl: SideControl | 'human'): TerminalOutcome {
+  if (winner === null) {
+    return { kind: 'draw', sentence: 'Game over — drawn.' };
+  }
+  const userWon = winner === seat.userColour;
+  if (userWon) {
+    return { kind: 'win', sentence: 'Game over — you won.' };
+  }
+  return {
+    kind: 'loss',
+    sentence: winnerControl === 'engine' ? 'Game over — the engine won.' : 'Game over — she won.',
+  };
+}

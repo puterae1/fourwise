@@ -9,10 +9,21 @@
 
 import type { Colour } from '../game/seat.js';
 import type { Level } from '../game/levels.js';
-import type { Controls, Levels, SideControl } from './types.js';
+import type { Controls, LevelQualifier, Levels, SideControl } from './types.js';
 import { Segmented } from './Segmented.js';
 import { ColourSwatch } from './ColourSwatch.js';
 import './PlayPanel.css';
+
+// SPEC §3.1's amended "Level-label honesty": plain-language qualifiers,
+// rendered as real visible text right next to the "Level" label/select --
+// NOT just a DOM/CSS attribute (the Wave 5a lesson: attribute-only styling
+// that sighted users can't perceive was a verifier FAIL). The move list's
+// `partial` badge is "necessary but not sufficient" per the amendment; this
+// is the level's OWN surface saying so.
+const LEVEL_QUALIFIER_TEXT: Record<Exclude<LevelQualifier, null>, string> = {
+  tactical: 'last move was a quick check, not full depth',
+  'centre-fallback': 'last move was a fallback, not evaluated',
+};
 
 const CONTROL_OPTIONS: ReadonlyArray<{ value: SideControl; label: string }> = [
   { value: 'human', label: 'Human' },
@@ -34,6 +45,9 @@ export interface PlayPanelProps {
   onControlChange: (colour: Colour, value: SideControl) => void;
   levels: Levels;
   onLevelChange: (colour: Colour, value: Level) => void;
+  /** SPEC §3.1's amended "Level-label honesty" -- see `LEVEL_QUALIFIER_TEXT`
+   *  above and `useGameController.ts`'s `levelQualifiers`. */
+  levelQualifiers: Record<Colour, LevelQualifier>;
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
@@ -47,6 +61,7 @@ function PlayerRow({
   onControlChange,
   level,
   onLevelChange,
+  qualifier,
 }: {
   roleLabel: string;
   colour: Colour;
@@ -54,6 +69,7 @@ function PlayerRow({
   onControlChange: (value: SideControl) => void;
   level: Level;
   onLevelChange: (value: Level) => void;
+  qualifier: LevelQualifier;
 }) {
   return (
     <div className="player-row">
@@ -69,20 +85,27 @@ function PlayerRow({
         onChange={onControlChange}
       />
       {control === 'engine' && (
-        <label className="player-row__level">
-          <span className="player-row__level-label">Level</span>
-          <select
-            className="player-row__level-select"
-            value={level}
-            onChange={(event) => onLevelChange(event.target.value as Level)}
-          >
-            {LEVELS.map((l) => (
-              <option key={l} value={l}>
-                {LEVEL_LABEL[l]}
-              </option>
-            ))}
-          </select>
-        </label>
+        <>
+          <label className="player-row__level">
+            <span className="player-row__level-label">Level</span>
+            <select
+              className="player-row__level-select"
+              value={level}
+              onChange={(event) => onLevelChange(event.target.value as Level)}
+            >
+              {LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {LEVEL_LABEL[l]}
+                </option>
+              ))}
+            </select>
+          </label>
+          {qualifier && (
+            <span className="player-row__level-qualifier" role="status">
+              {LEVEL_QUALIFIER_TEXT[qualifier]}
+            </span>
+          )}
+        </>
       )}
     </div>
   );
@@ -95,6 +118,7 @@ export function PlayPanel({
   onControlChange,
   levels,
   onLevelChange,
+  levelQualifiers,
   onUndo,
   onRedo,
   canUndo,
@@ -110,6 +134,7 @@ export function PlayPanel({
           onControlChange={(v) => onControlChange(userColour, v)}
           level={levels[userColour]}
           onLevelChange={(v) => onLevelChange(userColour, v)}
+          qualifier={levelQualifiers[userColour]}
         />
         <PlayerRow
           roleLabel="Opponent"
@@ -118,6 +143,7 @@ export function PlayPanel({
           onControlChange={(v) => onControlChange(opponentColour, v)}
           level={levels[opponentColour]}
           onLevelChange={(v) => onLevelChange(opponentColour, v)}
+          qualifier={levelQualifiers[opponentColour]}
         />
       </div>
       <div className="play-panel__actions">

@@ -47,6 +47,19 @@
   padding: 0 var(--sp-2);
 }
 
+/* SPEC §3.1's amended "Level-label honesty": a real, visible text note at
+ * the level's own surface -- same quiet, muted treatment as the move list's
+ * `partial` chip (`Rail.css`'s `.rail__move-partial`), not an attribute or
+ * colour-only signal (CLAUDE.md quality floor / the Wave 5a lesson). Wraps
+ * onto its own line on narrow layouts (`player-row` is already `flex-wrap`)
+ * rather than truncating or overflowing. */
+.player-row__level-qualifier {
+  flex-basis: 100%;
+  font-family: var(--f-body);
+  font-size: var(--t-micro-size);
+  color: var(--c-n-5);
+}
+
 .play-panel__actions {
   display: flex;
   justify-content: space-around;

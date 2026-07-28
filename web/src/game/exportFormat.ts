@@ -52,7 +52,9 @@ export function exportGameState(state: GameState, exportedAt: string = new Date(
   const game: ExportedGame = {
     seat: state.seat,
     setupPrefix: state.setupPrefix,
-    moves: state.moves.map((m) => (m.partial ? { column: m.column, partial: true } : { column: m.column })),
+    moves: state.moves.map((m) =>
+      m.partial ? { column: m.column, partial: true, ...(m.origin ? { origin: m.origin } : {}) } : { column: m.column },
+    ),
     date: exportedAt,
   };
   return { version: CURRENT_EXPORT_VERSION, exported: exportedAt, games: [game] };

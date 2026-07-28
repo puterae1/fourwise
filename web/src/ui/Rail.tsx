@@ -14,7 +14,7 @@
 // drift apart.
 
 import type { TranslatedAnalysis, VerdictKind } from '../game/verdict.js';
-import { capitalize } from './copy.js';
+import { capitalize, type TerminalOutcome } from './copy.js';
 import type { MoveListEntry } from './useGameController.js';
 import { ColourSwatch } from './ColourSwatch.js';
 import './Rail.css';
@@ -32,7 +32,23 @@ interface RailRow {
   distance: number | null;
 }
 
-function buildRows(translated: TranslatedAnalysis | null): RailRow[] {
+/**
+ * SPEC §3.2's terminal-display amendment: once the game is over there is
+ * nothing left to solve, so EVERY row reports the same seat-translated
+ * outcome instead of the normal per-column verdict/pending state — never
+ * "Still solving this column." under a headline that already says the game
+ * ended. `terminal.kind` reuses the existing win/draw/loss `RailRow.kind`
+ * so the bar styling needs no new CSS at all.
+ */
+function buildRows(translated: TranslatedAnalysis | null, terminal: TerminalOutcome | null): RailRow[] {
+  if (terminal) {
+    return Array.from({ length: 7 }, (_, column) => ({
+      column,
+      kind: terminal.kind,
+      sentence: terminal.sentence,
+      distance: null,
+    }));
+  }
   return Array.from({ length: 7 }, (_, column) => {
     const entry = translated?.columns[column];
     if (!entry || entry.kind === 'unknown') {
@@ -81,10 +97,15 @@ export interface RailProps {
   moveListEntries: MoveListEntry[];
   currentPly: number;
   onJump: (ply: number) => void;
+  /** SPEC §3.2's terminal-display amendment (default `null`, i.e. no change
+   * for a non-terminal position): when set, every row reports this outcome
+   * instead of the normal per-column verdict -- see `buildRows`'s own doc
+   * comment. */
+  terminal?: TerminalOutcome | null;
 }
 
-export function Rail({ translated, showVerdicts, revealed, moveListEntries, currentPly, onJump }: RailProps) {
-  const rows = orderRows(buildRows(translated), revealed);
+export function Rail({ translated, showVerdicts, revealed, moveListEntries, currentPly, onJump, terminal = null }: RailProps) {
+  const rows = orderRows(buildRows(translated, terminal), revealed);
 
   return (
     <aside className="rail">

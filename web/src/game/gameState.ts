@@ -15,11 +15,24 @@ export type Mode = 'play' | 'analyse' | 'setup';
 export interface Move {
   /** 0-indexed column, as everywhere else in the game/engine layers. */
   column: number;
-  /** True when the engine chose this move from an incomplete analysis
-   *  (SPEC §3.1 amendment, "Honesty") -- surfaced in the move list; a
-   *  blunder check must never fire across a move flagged this way (see
-   *  `blunder.ts`). */
+  /** True when the engine chose this move from anything less than the
+   *  level's own defining computation (SPEC §3.1 amendment, "Honesty") --
+   *  surfaced in the move list; a blunder check must never fire across a
+   *  move flagged this way (see `blunder.ts`). */
   partial?: boolean;
+  /** How this move was chosen, when `partial` is true (`game/levels.ts`'s
+   *  `EngineMoveOrigin`, minus `'complete'` -- a complete move never sets
+   *  this). Absent for a human move, and absent (not `'complete'`) for a
+   *  non-partial engine move -- `partial` alone already says "complete" in
+   *  that case. This is a REFINEMENT of `partial`, not a replacement: it
+   *  exists so the level label's own surface (`useGameController.ts`'s
+   *  `levelQualifiers`) can phrase the qualifier specifically ("a quick
+   *  check" vs "a fallback move") instead of only the generic move-list
+   *  "partial" badge. Optional and additive to the export/storage format
+   *  (`gameRecordValidation.ts`/`exportFormat.ts`) -- an older stored/
+   *  exported move without it is simply treated as an unspecified partial
+   *  qualifier, never rejected. */
+  origin?: 'tactical' | 'centre-fallback';
 }
 
 export interface GameState {
@@ -111,7 +124,11 @@ export type PlayResult = { ok: true; state: GameState } | { ok: false; error: st
  * abandoned redo tail first -- standard undo/redo semantics: a genuinely
  * new move discards the future it diverges from.
  */
-export function playMove(state: GameState, column: number, options: { partial?: boolean } = {}): PlayResult {
+export function playMove(
+  state: GameState,
+  column: number,
+  options: { partial?: boolean; origin?: Move['origin'] } = {},
+): PlayResult {
   if (column < 0 || column >= BOARD_COLUMNS) {
     return { ok: false, error: `Column ${column + 1} does not exist on a ${BOARD_COLUMNS}-column board.` };
   }
@@ -121,7 +138,9 @@ export function playMove(state: GameState, column: number, options: { partial?: 
   }
 
   const kept = state.moves.slice(0, state.currentPly);
-  const move: Move = options.partial ? { column, partial: true } : { column };
+  const move: Move = options.partial
+    ? { column, partial: true, ...(options.origin ? { origin: options.origin } : {}) }
+    : { column };
   const moves = [...kept, move];
   return { ok: true, state: { ...state, moves, currentPly: moves.length } };
 }

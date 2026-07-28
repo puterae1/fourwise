@@ -40,6 +40,15 @@ function createFakeClient(): { client: EngineClient; pending: PendingCall[] } {
       nodesPerMs: 1_000_000,
       msToNodeBudget: (ms) => Math.max(1, Math.round(ms * 1_000_000)),
     }),
+    tacticalFallback: async () => {
+      throw new Error('tacticalFallback() is not used by this file -- see useGameController.tacticalFallback.test.tsx');
+    },
+    loadBookFromNetwork: async () => {
+      throw new Error('loadBookFromNetwork() is not used by this test');
+    },
+    setBookEnabled: async () => {
+      throw new Error('setBookEnabled() is not used by this test');
+    },
     terminate: () => {},
   };
   return { client, pending };

@@ -47,6 +47,9 @@ function isMoveShape(value: unknown): value is Move {
     return false;
   }
   if ('partial' in v && v.partial !== undefined && typeof v.partial !== 'boolean') return false;
+  if ('origin' in v && v.origin !== undefined && v.origin !== 'tactical' && v.origin !== 'centre-fallback') {
+    return false;
+  }
   return true;
 }
 
@@ -59,7 +62,11 @@ export function parseMoveArray(value: unknown): Move[] | null {
   const moves: Move[] = [];
   for (const item of value) {
     if (!isMoveShape(item)) return null;
-    moves.push(item.partial ? { column: item.column, partial: true } : { column: item.column });
+    moves.push(
+      item.partial
+        ? { column: item.column, partial: true, ...(item.origin ? { origin: item.origin } : {}) }
+        : { column: item.column },
+    );
   }
   return moves;
 }

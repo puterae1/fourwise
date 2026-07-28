@@ -110,16 +110,25 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
   checkpoint. Header hand-verified: FWBK v1 depth=8 count=129498, size
   arithmetic exact. The stale gitignored web/public/book.bin.checkpoint
   (~2.2 MB) can be deleted at will.
-- **Production replay + re-solve battery RUNNING (detached, nice 0,
-  log ~/fourwise-replay-d8.log):** `cargo test --release --test
-  book_replay -- --ignored` — 1,000-entry loader replay with
-  independent key recompute, 200 seeded ply≥4 re-solves + 5-10 shallow
-  re-solves (incl. empty board), fresh Solver::new() per entry per the
-  owner ruling. Rehearsal-resolve test already passed within the run.
-  Expected multi-hour (shallow re-solves are minutes each). This is
-  gate criterion #2's primary evidence. Next after it: deploy, then
-  Wave 10 gate audit (use a plain static server for the 404 check, NOT
-  vite preview; investigate the win-line overlay flag).
+- **Production replay + re-solve battery PASSED 2026-07-29:**
+  `test result: ok. 2 passed; 0 failed` in 333.55 s (log
+  ~/fourwise-replay-d8.log) — 1,000-entry loader replay with
+  independent key recompute, 200 seeded ply≥4 fresh-solver re-solves,
+  shallow re-solves incl. the empty board (all counts assertion-
+  enforced per the Wave 8 audit). Far quicker than estimated: deep
+  entries re-solve in seconds with a fresh 64 MB solver; the empty
+  board dominated. Gate criterion #2's primary evidence: BANKED.
+- **DEPLOYED WITH BOOK 2026-07-29: run 30387660095 green;
+  https://puterae1.github.io/fourwise/book.bin serves HTTP 200,
+  1,165,492 bytes (etag size matches the committed file).**
+- **Wave 10 — PHASE 2 GATE AUDIT RUNNING** (verifier, on the deployed
+  artifact): criterion 1 measured opening-move latency in headless
+  Chrome; criterion 2 evidence-chain audit + its own 10-entry
+  independent spot re-solve; criterion 3 absent/corrupt/valid book via
+  the plain-static-server method (NOT vite preview); carried flags:
+  win-line overlay characterisation, qualifier-fades-with-book check,
+  four-seat wording spot check. Then orchestrator judgement, then
+  owner sign-off — Phase 3 does not begin until given.
 
 - **Wave 7.2 — DIAGNOSED 2026-07-28, no engine code at fault, zero
   source changes.** Root causes, measured: (1) PRIMARY — external

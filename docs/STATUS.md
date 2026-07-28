@@ -4,13 +4,14 @@
 > conversation disagree, this file wins. Read `docs/ROADMAP.md` for the phase
 > gates and `docs/ORCHESTRATION.md` for who runs on what.
 
-**Last updated:** 2026-07-28 (Phase 1 gate SIGNED — PASS)
+**Last updated:** 2026-07-29 (Phase 2 gate SIGNED — PASS)
 
 ## Current phase
 
-**Phase 2 — Opening book. Not started.** Phase 1 gate passed and owner-signed
-2026-07-28. Phase 2 wave breakdown proposed, awaiting owner approval; no
-Phase 2 delegation happens until the breakdown is approved and recorded here.
+**Phase 3 — Game log and opponent model. Not started.** Phase 2 gate
+passed and owner-signed 2026-07-29 ("CONFIRMED", on the record). No
+Phase 3 work begins until the wave breakdown is proposed, owner-approved,
+and recorded here. Phase 4 remains unsanctioned.
 
 ## Done
 
@@ -121,7 +122,8 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
 - **DEPLOYED WITH BOOK 2026-07-29: run 30387660095 green;
   https://puterae1.github.io/fourwise/book.bin serves HTTP 200,
   1,165,492 bytes (etag size matches the committed file).**
-## PHASE 2 GATE RECORD (assembled 2026-07-29, owner sign-off pending)
+## PHASE 2 GATE RECORD (assembled 2026-07-29 — **SIGNED: owner ruled
+PASS 2026-07-29 ("CONFIRMED"). Phase 2 is closed.**)
 
 **Criterion 1 — opening moves < 50 ms: MET.** Measured on the deployed
 URL, headless Chrome, MutationObserver-instrumented (not eyeballed):

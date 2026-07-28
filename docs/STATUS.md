@@ -102,9 +102,29 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
 
 ## In flight
 
-- **Wave 7** (`rust-engine`): book generator implementation, delegated
-  2026-07-28, running. Next: verifier audit, then the detached depth-8
-  overnight generation run.
+- **Wave 7 — code complete, committed `1a54f72`, verifier audit running
+  2026-07-28.** Caught mid-wave executing the depth-4 rehearsal in-session
+  (1h49m in); owner ordered it killed — the rehearsal itself is a ~100-min
+  job because the ply 0–4 tier (719 canonical positions) costs ~100 min of
+  solve time on the M-series machine AT ANY DEPTH; this fixed cost does not
+  amortize away as depth grows. Budget it into the production run. Killed
+  at 676/719; checkpoint `/tmp/book_d4.bin.checkpoint` holds 676 verified
+  `key score` lines — depth-agnostic (exact solves keyed by canonical
+  position key), reusable for the depth-8 run by copying it to
+  `<out>.checkpoint` and passing `--resume`. NOTE: /tmp does not survive
+  reboot; copy it before restarting the machine or accept re-solving.
+  Delivered: generator (21 new tests, 56→77 total, clippy clean),
+  ENGINE.md "Book format v1" section, mutation-tested (endianness /
+  canonicalisation / depth off-by-one all caught by named tests).
+  NOT yet produced (sanctioned): book_d4.bin, book_sample_v1.json — both
+  are written only at run completion, which happens detached.
+- **Depth-8 production run: OWNER runs it from a plain shell** (per
+  ruling 1 — never inside a Claude Code session). Command on record:
+  `cd ~/Projects/fourwise/engine && cp /tmp/book_d4.bin.checkpoint ../web/public/book.bin.checkpoint 2>/dev/null; nohup cargo run --release --bin gen_book -- --depth 8 --tt-mb 8192 --verify-sample 1000 --seed 42 --out ../web/public/book.bin --resume > ~/fourwise-genbook-d8.log 2>&1 &`
+  Progress: `grep gen_book ~/fourwise-genbook-d8.log | tail`. Kill-safe;
+  re-run the same command to resume after any interruption. Writes the
+  book atomically and `engine/tests/fixtures/book_sample_v1.json`
+  (1,000 seeded entries with move sequences) at completion — commit both.
 
 ## Done (continued — misfiled under "In flight" until 2026-07-28; every wave
 below is complete)

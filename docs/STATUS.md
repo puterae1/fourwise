@@ -121,14 +121,67 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
 - **DEPLOYED WITH BOOK 2026-07-29: run 30387660095 green;
   https://puterae1.github.io/fourwise/book.bin serves HTTP 200,
   1,165,492 bytes (etag size matches the committed file).**
-- **Wave 10 — PHASE 2 GATE AUDIT RUNNING** (verifier, on the deployed
-  artifact): criterion 1 measured opening-move latency in headless
-  Chrome; criterion 2 evidence-chain audit + its own 10-entry
-  independent spot re-solve; criterion 3 absent/corrupt/valid book via
-  the plain-static-server method (NOT vite preview); carried flags:
-  win-line overlay characterisation, qualifier-fades-with-book check,
-  four-seat wording spot check. Then orchestrator judgement, then
-  owner sign-off — Phase 3 does not begin until given.
+## PHASE 2 GATE RECORD (assembled 2026-07-29, owner sign-off pending)
+
+**Criterion 1 — opening moves < 50 ms: MET.** Measured on the deployed
+URL, headless Chrome, MutationObserver-instrumented (not eyeballed):
+book-served moves 0.3–3 ms END-TO-END (worker round-trip + render
+included) across 4 seats × 5 plies; engine-first-from-empty 15–16 ms;
+the two positions at the ply-8/9 book boundary took the tactical
+fallback at 15–29 ms — a different, correctly-labelled path, also
+under the bar. Book-loaded proof is behavioural (silent success by
+design): zero degrade lines, early Analyse settles 3–10 ms, qualifier
+absent through book coverage.
+
+**Criterion 2 — sampled entries match a full search: MET.** Chain
+audited: replay-battery log identity confirmed (post-book-commit
+timestamp, correct invocation, 0 failures, 333.55 s); assertion
+structure re-cited line-by-line (1,000 replays w/ independent key
+recompute; exactly 200 seeded ply≥4 fresh-solver re-solves; 5–10
+shallow, count-enforced); local book.bin sha256 == deployed book.bin
+sha256 (bit-identical, 1,165,492 B); PLUS the verifier's own 12-entry
+spot check — own Rust binary, own hand-picked indices spanning plies
+2–8, fresh solver each: 12/12 exact. No gen_book process left running.
+
+**Criterion 3 — absent/corrupt book degrades silently: MET.** Plain-
+static-server method (curl-confirmed real 404 first; vite preview
+unusable per Wave 9 finding): absent → app boots and plays, exactly
+one info line, no error UI (screenshot); corrupt (truncated to 20 B →
+TruncatedKeys) → identical silent degrade (screenshot); valid → silent
+success, zero lines. Only console noise anywhere: the browser's own
+favicon.ico 404, present identically in all scenarios and pre-existing
+on the live site — cosmetic, logged here for completeness.
+
+**Carried flags:** qualifier-fade CLOSED (fires exactly at the book
+boundary, clears both sides — the §3.1 mechanism working as designed);
+seat sweep CLOSED (incl. a recorded false-alarm self-correction:
+Strong's randomised opening tie-break makes empty-board verdicts vary
+by session — methodology trap, not a defect; four-seat test re-judged
+genuinely non-vacuous). Standing checks all green (suites, clippy,
+build, 302 web tests, colour-word sweep, reduced-motion hard-disable,
+worker isolation, no third-party calls).
+
+**TWO ITEMS FOR OWNER RULING BEFORE SIGN-OFF (neither is a ROADMAP
+gate criterion):**
+1. **Win-line overlay: confirmed MISSING FEATURE** — DESIGN-DIRECTION
+   §9 specifies a 5px Frame line through the four winning disc centres
+   + raised elevation; only the elevation half exists (Board.css:
+   188-190 is data-win's sole consumer; no line-drawing code anywhere;
+   live-confirmed on a real won game). Not a CSS-invisibility bug, not
+   an amended-away requirement. Ruling: implement now or record
+   explicit deferral here.
+2. **NEW: parity ruler does not hide on game-over** (App.tsx:298-299
+   lacks an isGameOver gate; "Waiting threats" caption renders under a
+   won game — screenshot on record). Same honesty class as fixed
+   defect #3; SPEC §3.2's terminal-beats-analysis clause does not
+   explicitly cover the ruler. Ruling: fix now (+ SPEC clarification)
+   or defer.
+
+**Orchestrator judgement: all three gate criteria MET. Gate
+recommendation: PASS**, with the two rulings above resolved either
+way before signature (recommendation: fix both now — each is small,
+web-only, and the same honesty/design class this phase existed to
+close). Awaiting owner signature; Phase 3 does not begin until given.
 
 - **Wave 7.2 — DIAGNOSED 2026-07-28, no engine code at fault, zero
   source changes.** Root causes, measured: (1) PRIMARY — external

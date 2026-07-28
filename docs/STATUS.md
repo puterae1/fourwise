@@ -162,13 +162,24 @@
   under a local prefix server (all asset classes 200 with the prefix, 404
   without).
 
+- **DEPLOYED 2026-07-28: https://puterae1.github.io/fourwise/** — repo
+  public (owner-sanctioned after inventory review), Pages enabled (Actions
+  source), deploy dispatched and green. Live verification: full asset
+  chain curled cold with no-cache (index/js/css/worker/wasm/fonts all 200,
+  wasm as application/wasm) under the real /fourwise/ base; first-ever-
+  visit cold load renders correctly; end-to-end wasm proof on the deployed
+  artifact — human move played, engine replied with the honest partial
+  badge, role-based control defaults live.
+
 ## In flight
 
-Awaiting owner: (1) repo-public flip + Pages enablement (inventory
-reviewed: .claude/, ORCHESTRATION quota strategy, STATUS decision history,
-CAMERA.md, OPPONENT-MODEL.md; history scan clean; author email visible),
-then first deploy dispatch; (2) 6c on-device evidence (phone, incl.
-mobile Safari) against the live URL; then the full gate audit.
+- **Phase 1 gate audit** (`verifier`): four of five criteria with evidence;
+  criterion 1's primary evidence is the full release-fixture run executing
+  on CI (bare checkout, deployed commit); criterion 3's on-device half
+  HELD for owner phone evidence per instruction.
+- Awaiting owner: 6c on-device evidence (phone, incl. mobile Safari)
+  against the live URL — the held half of criterion 3 and the final gate
+  input.
 
 ## Ownership
 

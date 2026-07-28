@@ -145,9 +145,29 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
   get a throughput/utilisation floor in their audit criteria from now
   on.** Launch-script changes, if any, go through the orchestrator.
 
-- **Wave 8 — delegated 2026-07-28, running** (book.rs loader from doc
-  alone, tactical fallback, sample-replay mechanism per the owner's
-  200+5-10 fresh-solver ruling, two 7.1 nits).
+- **Wave 8 — code COMPLETE 2026-07-28, committed `9050e0c`, verifier
+  audit RUNNING.** Delivered: book.rs loader implemented STRICTLY from
+  ENGINE.md (three real doc gaps found and resolved conservatively —
+  duplicates rejected, trailing bytes = corrupt, checked arithmetic
+  for wasm32 usize; ENGINE.md amendments due post-audit); tactical.rs
+  separate fixed-depth search (negamax byte-unchanged), move-8 trap
+  class reproduced and refuted at horizon boundary; wasm exports
+  load_book/set_book_enabled(permanent flag)/tactical_fallback, Node
+  smoke on the real compiled artifact; corrupt-book matrix incl.
+  2000-iter fuzz, count-overflow guards; book-absent === book-agnostic
+  equivalence tests per ruling 3; rehearsal replay 300/300 + 6
+  fresh-solver re-solves exact (16.5 s release). Tests 98→145, clippy
+  clean, Cargo.lock diff empty. Deviations on record: production
+  replay's shallow half constructs 8 short sequences directly (the
+  depth-biased rehearsal sample had no shallow entries); production
+  replay is #[ignore]d and fails LOUDLY until book.bin + sample land;
+  shared-solver mutation honestly reported as structural-only (not
+  outcome-discriminating). Wave 9 flags: BookLoadResult/
+  TacticalAnalysis wasm shapes + child-relative max_ply convention
+  need pinning in ENGINE.md before the TS wrapper is written.
+  **Release-fixtures CI run 30367948450: SUCCESS (log-verified) — all
+  six sets exact on the Wave 7.1 engine (TtHandle dispatch), 8/8
+  release suite in 5,613 s.** Engine-change exactness reconfirmed.
 
 - **Wave 7.1 — verifier PASS 2026-07-28 (7/7, one non-blocking finding;
   fix in flight).** Verifier ran its OWN evidence, not the implementer's:

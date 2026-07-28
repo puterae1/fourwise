@@ -62,8 +62,6 @@
   release, colour-blindness/sentinel/no-unsafe invariants confirmed,
   fixtures integrity and score convention hand-verified.
 
-## In flight
-
 - **Wave 3, engine half** (`rust-engine`): delivered 2026-07-28 — analysis.rs
   core + budgeted solver + wasm exports + pkg built. Owner gate review:
   POV test confirmed independent (negated direct child solve); boundary
@@ -85,6 +83,25 @@
   scores/threats identical to native and Node results; no console errors.
   Wave 3 committed as a whole after both checks.
 
+- **First-run seat prompt — COMPLETE, verifier PASS 2026-07-28** (owner
+  ruling on the default-seat question): one screen, both questions
+  unselected, Start gated until both answered, calibration warmed behind
+  the prompt (engine's first move landed instantly in the browser check),
+  seat-only localStorage (`fourwise:seat`, validated on read), DEFAULT_SEAT
+  removed. Five browser checks green incl. returning-user reload (no
+  re-ask, seat preserved; in-app change persists). 112 web tests. Minor
+  notes carried to Wave 5: stale calibration comment in useEngineClient.ts;
+  add a corrupt-stored-seat unit test.
+- **Design-doc amendment — COMPLETE** (design-lead, headless Opus, verified
+  11/11 calls on claude-opus-5): mockup captions marked post-selection
+  states, final connect4-lab → fourwise rename, §8.4 confirmed consistent
+  with the §14.1 override. Diff scope-audited by verifier: two hunks, no
+  restyling.
+
+## In flight
+
+Nothing. No agents running.
+
 ## Ownership
 
 | Agent | Model | Owns |
@@ -100,17 +117,9 @@
 Reconstructed from `docs/ROADMAP.md` + `docs/ENGINE.md` after the original plan
 text was lost in a context handover. Owner may re-cut these.
 
-- **Wave 3** (`rust-engine` then `web-ui`): WASM boundary per the amended
-  ENGINE.md §WASM boundary (five pinned decisions, 2026-07-28): budgeted
-  `analyse(position, node_budget)` with `ColumnEval` score/full/unknown and
-  `complete` flag; per-column scores from the analysed position's mover's
-  perspective (child score negated); 0-indexed API everywhere, 1-indexed
-  only in position strings; NO `best_move` — levels live in the game layer
-  in TS; persistent module-level TT, one WASM instance per worker; engine
-  clock-free. Then `wasm-pack` build into `web/src/engine/pkg/`, Vite +
-  React scaffold, Web Worker wrapper + typed TS wrapper with time→nodes
-  calibration. `sideToMove` stays `'first' | 'second'`, never a colour.
-- **Wave 4** (`web-ui`; design-lead already done), split in two, governed by
+Waves 3 and 4 are complete (see Done). Remaining:
+
+- **Wave 4 (complete — record)** (`web-ui`; design-lead already done), split in two, governed by
   the 2026-07-28 owner pins (SPEC §1 amended acceptance test, §3.1 level
   mechanics + engine-move-under-partial, §3.3 setup reconstruction in TS
   with fifth verdict, ENGINE.md stale-result discard):
@@ -138,8 +147,13 @@ text was lost in a context handover. Owner may re-cut these.
     exactly that state; moot after Wave 5 persistence except on first run.
     (2) Desktop rail (§8.4 best-first-after-reveal) not implemented —
     assigned to Wave 5 polish.
-- **Wave 5** (`web-ui`): per-column analysis in plain language, blunder flag,
-  parity ruler scoped to single threats, `localStorage` persistence.
+- **Wave 5** (`web-ui`): per-column analysis in plain language (the deeper
+  panel beyond 4b's verdict strip), blunder flag UI (logic exists in
+  blunder.ts), parity ruler scoped to single threats (logic in parity.ts),
+  remaining `localStorage` persistence (game state + JSON export/import;
+  seat slice landed early with the first-run prompt), desktop rail per
+  DESIGN-DIRECTION §8.4 (Play ranked from start, Analyse re-sorts only
+  after Show me — wording pre-verified against the §14.1 override).
 - **Wave 6** (`web-ui` + `verifier`): accessibility (keyboard, reduced motion,
   one-handed portrait), mobile performance (< 1 s mid-game analysis on a
   mid-range phone), GitHub Actions → Pages deploy. Then a full `verifier`

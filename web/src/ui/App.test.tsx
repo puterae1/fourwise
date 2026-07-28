@@ -16,9 +16,13 @@
 // without faking the engine boundary.
 
 import '@testing-library/jest-dom/vitest';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import App from './App.js';
+import { SEAT_STORAGE_KEY } from './seatStorage.js';
+import { installMemoryLocalStorage } from './testMemoryStorage.js';
+
+installMemoryLocalStorage();
 
 // jsdom has no Worker implementation. `useEngineClient` creates one on
 // mount (`engine/client.ts`'s `createWorkerTransport`); a minimal fake that
@@ -33,7 +37,20 @@ class FakeWorker {
 }
 (globalThis as unknown as { Worker: typeof FakeWorker }).Worker = FakeWorker;
 
-afterEach(cleanup);
+// These tests are about the game/mode/seat behaviour that already existed
+// before the first-run prompt (`SeatPrompt.test.tsx` and
+// `firstRun.test.tsx` cover the prompt itself), so they seed a stored seat
+// before every render -- matching the seat these tests were written
+// against (firstMover: red, userColour: red) -- so `App` skips the prompt
+// and renders the live game exactly as it did before the prompt existed.
+beforeEach(() => {
+  window.localStorage.setItem(SEAT_STORAGE_KEY, JSON.stringify({ firstMover: 'red', userColour: 'red' }));
+});
+
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
 
 function youAreGroup() {
   return screen.getByRole('radiogroup', { name: 'Your colour' });

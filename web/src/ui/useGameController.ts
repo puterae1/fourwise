@@ -98,9 +98,20 @@ export interface GameController {
   commitSetup: (grid: Grid, targetMode: 'play' | 'analyse') => { ok: true } | { ok: false; message: string };
 }
 
-const DEFAULT_SEAT: Seat = { firstMover: 'red', userColour: 'red' };
+// No fixed default seat (owner ruling, see `SeatPrompt.tsx`): a hardcoded
+// default would silently answer the question this tool exists to make the
+// user answer. The seat comes from the first-run prompt or from storage,
+// via `initialSeat` below, and until one exists this hook returns `null` --
+// there is no game to derive a `GameController` from yet.
+//
+// `PLACEHOLDER_SEAT` exists only to keep the internal hooks below
+// type-safe before `initialSeat` arrives; it is never observable. Every
+// value derived from it is discarded by the `if (!game) return null;` gate
+// at the bottom of this hook, so nothing downstream can ever render a game
+// from it -- the placeholder cannot leak past this file.
+const PLACEHOLDER_SEAT: Seat = { firstMover: 'red', userColour: 'red' };
 
-export function useGameController(client: EngineClient | null): GameController {
+export function useGameController(client: EngineClient | null, initialSeat: Seat | null): GameController | null {
   // `seat` is NOT separate state: `GameState` already carries its own
   // `seat` field (`game/gameState.ts`), and `colourToMove`/`sideToMove`/
   // `absolutePly` all read `state.seat` internally. A standalone `seat`
@@ -108,8 +119,33 @@ export function useGameController(client: EngineClient | null): GameController {
   // only source of truth is what makes "changing seat re-renders colours
   // from the same game state, no reset" true by construction rather than
   // by careful bookkeeping.
-  const [game, setGame] = useState<GameState>(() => createGame(DEFAULT_SEAT, 'play'));
-  const seat = game.seat;
+  const [game, setGame] = useState<GameState | null>(() => (initialSeat ? createGame(initialSeat, 'play') : null));
+
+  // Starts the game the first time `initialSeat` goes from absent to
+  // present (the prompt's Start button, or a stored seat arriving after
+  // mount) -- deliberately done DURING render, not in a `useEffect`, per
+  // React's documented "adjusting state when a prop changes" pattern: a
+  // `setState` call in an effect would still commit and paint one frame of
+  // this hook returning `null` (the caller's prompt) before the effect
+  // flushed and a second render showed the live game. Adjusting state here
+  // means React discards that stale render and retries immediately with
+  // `game` already set, so there is no in-between frame to paint --
+  // "tapping Start must land on a live board, not a spinner" holds for the
+  // very first frame, not eventually.
+  const [seenInitialSeat, setSeenInitialSeat] = useState(initialSeat);
+  if (initialSeat !== seenInitialSeat) {
+    setSeenInitialSeat(initialSeat);
+    if (!game && initialSeat) {
+      setGame(createGame(initialSeat, 'play'));
+    }
+  }
+
+  // Always defined, so every hook below can read it unconditionally; only
+  // meaningful once `game` itself is non-null, which the final `if (!game)
+  // return null;` gate guarantees for anything this hook actually returns.
+  const placeholderGame = useMemo(() => createGame(PLACEHOLDER_SEAT, 'play'), []);
+  const effectiveGame = game ?? placeholderGame;
+  const seat = effectiveGame.seat;
   const [controls, setControls] = useState<Controls>({ red: 'human', yellow: 'engine' });
   const [levels, setLevels] = useState<Levels>({ red: 'strong', yellow: 'strong' });
   const [markersOn, setMarkersOn] = useState(true);
@@ -128,20 +164,24 @@ export function useGameController(client: EngineClient | null): GameController {
     }
   }, [client]);
 
-  const board = useMemo(() => deriveBoard(game), [game]);
-  const positionKey = enginePosition(game);
-  const legal = useMemo(() => new Set(legalColumns(game)), [game]);
+  const board = useMemo(() => deriveBoard(effectiveGame), [effectiveGame]);
+  const positionKey = enginePosition(effectiveGame);
+  const legal = useMemo(() => new Set(legalColumns(effectiveGame)), [effectiveGame]);
 
+  // Every `setGame` updater below guards `g` for null: before `initialSeat`
+  // arrives `game` is `null` and none of these are reachable from the UI
+  // (the controller itself is `null` then -- see the final gate), but the
+  // guard keeps the updaters honest regardless of call order.
   const setUserColour = useCallback(
-    (colour: Colour) => setGame((g) => ({ ...g, seat: { ...g.seat, userColour: colour } })),
+    (colour: Colour) => setGame((g) => (g ? { ...g, seat: { ...g.seat, userColour: colour } } : g)),
     [],
   );
   const setFirstMover = useCallback(
-    (colour: Colour) => setGame((g) => ({ ...g, seat: { ...g.seat, firstMover: colour } })),
+    (colour: Colour) => setGame((g) => (g ? { ...g, seat: { ...g.seat, firstMover: colour } } : g)),
     [],
   );
 
-  const setModeFn = useCallback((mode: Mode) => setGame((g) => gameSetMode(g, mode)), []);
+  const setModeFn = useCallback((mode: Mode) => setGame((g) => (g ? gameSetMode(g, mode) : g)), []);
 
   const setControl = useCallback(
     (colour: Colour, value: SideControl) => setControls((c) => ({ ...c, [colour]: value })),
@@ -154,15 +194,17 @@ export function useGameController(client: EngineClient | null): GameController {
 
   const play = useCallback((column: number) => {
     setGame((g) => {
+      if (!g) return g;
       const result = playMove(g, column);
       return result.ok ? result.state : g;
     });
   }, []);
 
-  const undo = useCallback(() => setGame((g) => gameUndo(g)), []);
-  const redo = useCallback(() => setGame((g) => gameRedo(g)), []);
+  const undo = useCallback(() => setGame((g) => (g ? gameUndo(g) : g)), []);
+  const redo = useCallback(() => setGame((g) => (g ? gameRedo(g) : g)), []);
   const jumpToPly = useCallback((ply: number) => {
     setGame((g) => {
+      if (!g) return g;
       const result = gameJumpToPly(g, ply);
       return result.ok ? result.state : g;
     });
@@ -170,6 +212,7 @@ export function useGameController(client: EngineClient | null): GameController {
 
   const canDrop = useCallback(
     (column: number) => {
+      if (!game) return false;
       if (game.mode !== 'play') return false;
       if (board.isGameOver) return false;
       if (!legal.has(column)) return false;
@@ -186,17 +229,22 @@ export function useGameController(client: EngineClient | null): GameController {
   // ---------------------------------------------------------------------
   useEffect(() => {
     const session = sessionRef.current;
-    if (!client || !session) return;
-    if (game.mode === 'setup' || board.isGameOver) {
+    if (!client || !session || !game) return;
+    // Captured into its own `const` with an explicit non-null type so the
+    // nested async closure below sees `GameState`, not `GameState | null`
+    // -- TypeScript's narrowing of `game` from the guard above does not
+    // reliably survive into a nested function expression's closure.
+    const activeGame: GameState = game;
+    if (activeGame.mode === 'setup' || board.isGameOver) {
       setThinking(false);
       return;
     }
 
-    const position = enginePosition(game);
-    const mover = gameColourToMove(game);
+    const position = enginePosition(activeGame);
+    const mover = gameColourToMove(activeGame);
     const moverControl = controls[mover];
-    const showLampForThisMove = game.mode === 'play' && mover === seat.userColour && moverControl === 'human';
-    const needsAnalysis = game.mode === 'analyse' || moverControl === 'engine' || showLampForThisMove;
+    const showLampForThisMove = activeGame.mode === 'play' && mover === seat.userColour && moverControl === 'human';
+    const needsAnalysis = activeGame.mode === 'analyse' || moverControl === 'engine' || showLampForThisMove;
 
     if (!needsAnalysis) {
       setThinking(false);
@@ -219,9 +267,13 @@ export function useGameController(client: EngineClient | null): GameController {
       if (cancelled) return;
 
       const ms =
-        game.mode === 'analyse' ? ANALYSE_THINK_MS : moverControl === 'engine' ? LEVEL_THINK_MS[levels[mover]] : AUTO_REVEAL_THINK_MS;
+        activeGame.mode === 'analyse'
+          ? ANALYSE_THINK_MS
+          : moverControl === 'engine'
+            ? LEVEL_THINK_MS[levels[mover]]
+            : AUTO_REVEAL_THINK_MS;
       const ceiling = Math.max(calibration ? calibration.msToNodeBudget(ms) : FALLBACK_BUDGET_CEILING, 50_000);
-      const ply = absolutePly(game);
+      const ply = absolutePly(activeGame);
 
       const tokened = await session.start(position, ceiling, (update) => {
         if (cancelled) return;
@@ -232,10 +284,10 @@ export function useGameController(client: EngineClient | null): GameController {
       setRawAnalysis({ position: tokened.position, result: tokened.result });
       setThinking(false);
 
-      if (game.mode === 'play' && moverControl === 'engine') {
+      if (activeGame.mode === 'play' && moverControl === 'engine') {
         const chosen = pickEngineMove(tokened.result, ply, levels[mover]);
         setGame((g) => {
-          if (enginePosition(g) !== position) return g; // position moved on already -- discard
+          if (!g || enginePosition(g) !== position) return g; // position moved on already -- discard
           const result = playMove(g, chosen.column, { partial: chosen.partial });
           return result.ok ? result.state : g;
         });
@@ -262,8 +314,9 @@ export function useGameController(client: EngineClient | null): GameController {
 
   const analysisIsCurrent = rawAnalysis?.position === positionKey;
   const translated = useMemo(
-    () => (analysisIsCurrent && rawAnalysis ? translateAnalysis(rawAnalysis.result, absolutePly(game), seat) : null),
-    [analysisIsCurrent, rawAnalysis, game, seat],
+    () =>
+      analysisIsCurrent && rawAnalysis ? translateAnalysis(rawAnalysis.result, absolutePly(effectiveGame), seat) : null,
+    [analysisIsCurrent, rawAnalysis, effectiveGame, seat],
   );
   const rawColumns = analysisIsCurrent && rawAnalysis ? rawAnalysis.result.columns : null;
 
@@ -273,28 +326,28 @@ export function useGameController(client: EngineClient | null): GameController {
 
   const litColumn = useMemo(() => {
     if (board.isGameOver || translated?.best == null) return null;
-    if (game.mode === 'play') {
-      const mover = gameColourToMove(game);
+    if (effectiveGame.mode === 'play') {
+      const mover = gameColourToMove(effectiveGame);
       const showLamp = mover === seat.userColour && controls[mover] === 'human';
       return showLamp ? translated.best : null;
     }
-    if (game.mode === 'analyse') {
+    if (effectiveGame.mode === 'analyse') {
       return analyseRevealed ? translated.best : null;
     }
     return null;
-  }, [board.isGameOver, translated, game, seat, controls, analyseRevealed]);
+  }, [board.isGameOver, translated, effectiveGame, seat, controls, analyseRevealed]);
 
-  const turnColour = game.mode === 'setup' || board.isGameOver ? null : gameColourToMove(game);
+  const turnColour = effectiveGame.mode === 'setup' || board.isGameOver ? null : gameColourToMove(effectiveGame);
 
   const moveListEntries: MoveListEntry[] = useMemo(
     () =>
-      game.moves.map((m, i) => ({
+      effectiveGame.moves.map((m, i) => ({
         ply: i + 1,
         column: m.column,
-        colour: colourAtPly(seat, game.setupPrefix.length + i),
+        colour: colourAtPly(seat, effectiveGame.setupPrefix.length + i),
         partial: m.partial ?? false,
       })),
-    [game.moves, game.setupPrefix, seat],
+    [effectiveGame.moves, effectiveGame.setupPrefix, seat],
   );
 
   const commitSetup = useCallback(
@@ -306,6 +359,13 @@ export function useGameController(client: EngineClient | null): GameController {
     },
     [seat],
   );
+
+  // No seat chosen yet (first-run prompt still up): there is no game to
+  // hand back, by construction rather than by convention -- everything
+  // above this point used `effectiveGame`/`PLACEHOLDER_SEAT` only to keep
+  // React's hooks unconditional; nothing derived from them escapes past
+  // this gate.
+  if (!game) return null;
 
   return {
     seat,

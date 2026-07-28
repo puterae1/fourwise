@@ -273,6 +273,19 @@ pushes the board off screen.
 Board sizing on phone: page width − 24px gutter − 22px parity gutter, ÷ 7. At 390px that
 is 49px cells and a 294px-tall board. Discs are 82% of a cell.
 
+**Note on the seat bar in every wireframe below (§8.1–8.4).** The wireframes draw
+`[●Red|○Yel]` on both seat controls because a wireframe has to draw *some* state. Those are
+**post-selection states, not defaults** — read them as "the user has already chosen red",
+not as "red is preselected". §5's prohibition on red as a default stands unamended and
+outranks the diagrams.
+
+It is honoured by a **first-run seat prompt**: one screen asking both questions — "Who moves
+first?" and "Which colour are you?" — as two independent controls of equal weight, with
+neither colour preselected on either and neither colour given primary treatment, followed by
+`Start`. `Start` is disabled until both are answered, so the app never holds a seat the user
+did not pick. The seat then persists, and the seat bar shows the user's own choice from that
+point on — which is exactly what the wireframes depict.
+
 ### 8.1 Play — phone
 
 **The backlight is on by default in Play.** No tap, no hint control in this mode — the best
@@ -427,7 +440,7 @@ width 1180px, centred.
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
-│  connect4-lab      YOU ARE [●Red|○Yel]   [●Red|○Yel] MOVES FIRST      │
+│  fourwise          YOU ARE [●Red|○Yel]   [●Red|○Yel] MOVES FIRST      │
 ├──────────────────────────────────────┬────────────────────────────────┤
 │                                      │  PLAY  │ ANALYSE │ SETUP       │
 │     1    2    3    4    5    6    7  ├────────────────────────────────┤

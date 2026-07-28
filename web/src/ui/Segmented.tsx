@@ -18,7 +18,12 @@ export interface SegmentedProps<T extends string> {
   name: string;
   legend: string;
   options: ReadonlyArray<SegmentedOption<T>>;
-  value: T;
+  /**
+   * `null` means "nothing chosen yet" -- every option renders unchecked and
+   * `checked === opt.value` is false for all of them. Used by the first-run
+   * seat prompt (`SeatPrompt.tsx`), where neither control may be preselected.
+   */
+  value: T | null;
   onChange: (value: T) => void;
   className?: string;
 }

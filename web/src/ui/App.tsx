@@ -8,6 +8,8 @@ import { useEngineClient } from './useEngineClient.js';
 import { useGameController, opponentColourOf } from './useGameController.js';
 import { useSetupEditor } from './useSetupEditor.js';
 import { SeatControls } from './SeatControls.js';
+import { SeatPrompt } from './SeatPrompt.js';
+import { loadStoredSeat, saveSeat } from './seatStorage.js';
 import { ModeSwitch } from './ModeSwitch.js';
 import { HeadlineSlot } from './HeadlineSlot.js';
 import { Board } from './Board.js';
@@ -24,6 +26,7 @@ import {
   positionSummary,
   turnContextLine,
 } from './copy.js';
+import type { Seat } from '../game/seat.js';
 import type { TranslatedAnalysis } from '../game/verdict.js';
 import './App.css';
 
@@ -38,25 +41,46 @@ function selectedColumnSentence(index: number, translated: TranslatedAnalysis | 
 
 function App() {
   const client = useEngineClient();
-  const controller = useGameController(client);
-  const setup = useSetupEditor(controller.seat.firstMover, controller.seat.userColour);
-  const prevModeRef = useRef(controller.mode);
+
+  // First-run seat prompt (owner ruling, SPEC.md §1/§5): read once at
+  // mount, never defaulted. A stored seat here means `useGameController`
+  // starts the real game immediately -- no prompt render, no flash. `null`
+  // means the prompt is up and `chosenSeat` stays `null` until Start.
+  const [chosenSeat, setChosenSeat] = useState<Seat | null>(() => loadStoredSeat());
+  const controller = useGameController(client, chosenSeat);
+
+  // `useSetupEditor`, the mode-transition ref and the keyboard listener
+  // below all need *some* colour pair to stay hooks-unconditional while the
+  // prompt is up (`controller` is `null` then) -- the fallback is inert
+  // because everything that would act on it is gated behind `!controller`
+  // just below, so it never reaches the screen.
+  const setup = useSetupEditor(controller?.seat.firstMover ?? 'red', controller?.seat.userColour ?? 'red');
+  const prevModeRef = useRef(controller?.mode ?? 'play');
   const [moveListOpen, setMoveListOpen] = useState(false);
+
+  // Persist the seat (SPEC §5, "seat preference remembered") on every
+  // change -- the prompt's own Start handler covers the very first write,
+  // this covers every later in-app seat change via `SeatControls`.
+  useEffect(() => {
+    if (controller) saveSeat(controller.seat);
+  }, [controller?.seat]);
 
   // Setup mode is a fresh edit every time it's entered (see useSetupEditor's
   // own comment) -- reset when the mode transitions INTO setup, not on
   // every render while already there.
   useEffect(() => {
+    if (!controller) return;
     if (controller.mode === 'setup' && prevModeRef.current !== 'setup') {
       setup.reset();
     }
     prevModeRef.current = controller.mode;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [controller.mode]);
+  }, [controller?.mode]);
 
   useEffect(() => {
+    if (!controller) return;
     document.documentElement.dataset.markers = controller.markersOn ? 'on' : 'off';
-  }, [controller.markersOn]);
+  }, [controller?.markersOn]);
 
   // SPEC §4: "Full keyboard control: number keys 1-7 to play, u undo, r
   // redo." Global listener -- design §10 notes columns are individually
@@ -64,6 +88,7 @@ function App() {
   // regardless of what currently has focus.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (!controller) return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
       if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
@@ -91,6 +116,17 @@ function App() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [controller, setup]);
+
+  if (!controller) {
+    return (
+      <div className="page">
+        <header className="page__utility">
+          <span className="page__title">fourwise</span>
+        </header>
+        <SeatPrompt client={client} onStart={setChosenSeat} />
+      </div>
+    );
+  }
 
   const opponentColour = opponentColourOf(controller.seat);
 

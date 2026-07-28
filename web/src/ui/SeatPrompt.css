@@ -1,0 +1,69 @@
+/* One screen, both choices, no wizard (owner ruling). Seat-neutral: the two
+ * controls are equal-weight columns, neither colour is a default, and Red
+ * never sorts before Yellow by virtue of markup order alone -- both
+ * `Segmented` groups list Red then Yellow only because `SeatControls.tsx`
+ * does the same for consistency, not because either is primary. */
+
+.seat-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  padding: var(--sp-6) var(--gutter);
+  align-items: stretch;
+}
+
+.seat-prompt__lede {
+  font-family: var(--f-body);
+  font-size: var(--t-body-lg-size);
+  line-height: var(--t-body-lg-lh);
+  color: var(--c-n-5);
+  text-align: center;
+}
+
+.seat-prompt__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-5);
+  justify-content: center;
+}
+
+.seat-prompt__control {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.seat-prompt__caption {
+  font-family: var(--f-display);
+  font-weight: var(--w-label);
+  font-size: var(--t-label-size);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-n-7);
+  text-align: center;
+}
+
+.seat-prompt__start {
+  appearance: none;
+  align-self: center;
+  min-width: 220px;
+  min-height: 48px;
+  border: none;
+  border-radius: var(--r-md);
+  background: var(--c-n-9);
+  color: var(--c-n-0);
+  font-family: var(--f-display);
+  font-weight: var(--w-title);
+  font-size: var(--t-title-size);
+  cursor: pointer;
+  box-shadow: var(--el-raised);
+}
+
+.seat-prompt__start:disabled {
+  background: var(--c-n-2);
+  color: var(--c-n-5);
+  cursor: default;
+  box-shadow: none;
+}

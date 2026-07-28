@@ -389,7 +389,24 @@ impl Args {
             match arg.as_str() {
                 "--depth" => depth = expect_value(&mut it, "--depth").parse().expect("--depth must be an integer 0..=255"),
                 "--out" => out = PathBuf::from(expect_value(&mut it, "--out")),
-                "--tt-mb" => tt_mb = expect_value(&mut it, "--tt-mb").parse().expect("--tt-mb must be a positive integer"),
+                "--tt-mb" => {
+                    tt_mb = expect_value(&mut it, "--tt-mb")
+                        .parse()
+                        .expect("--tt-mb must be a positive integer");
+                    // A table-layer clamp (`SharedTranspositionTable::
+                    // with_capacity`) already protects correctness at any
+                    // small-but-nonzero budget, so this isn't load-bearing
+                    // for safety -- but 0 almost certainly means a typo
+                    // (a missing value, an unintended env substitution)
+                    // rather than a deliberate "use the safe minimum"
+                    // request, so it gets a clear, immediate error instead
+                    // of silently reinterpreting it.
+                    assert!(
+                        tt_mb > 0,
+                        "--tt-mb must be greater than 0 (got 0); pass a real budget in MB, \
+                         e.g. --tt-mb 4096"
+                    );
+                }
                 "--verify-sample" => {
                     verify_sample = expect_value(&mut it, "--verify-sample")
                         .parse()
@@ -1381,6 +1398,13 @@ mod tests {
     #[test]
     fn default_threads_is_never_zero() {
         assert!(default_threads() >= 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "--tt-mb must be greater than 0")]
+    fn args_parse_rejects_tt_mb_zero() {
+        let raw = ["--tt-mb", "0"];
+        let _ = Args::parse(raw.into_iter().map(String::from));
     }
 
     // -------------------------------------------------------------

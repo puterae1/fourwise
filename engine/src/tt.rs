@@ -105,11 +105,20 @@ pub const DEFAULT_BYTE_BUDGET: usize = 64 * 1024 * 1024;
 
 /// Smallest table size at which `partial_key: u32` is guaranteed lossless
 /// for a real `Position::key()` (bounded by ~2^50): below this, the
-/// quotient `key / capacity` could exceed `u32::MAX`. Only referenced from
-/// tests (production code always goes through `with_byte_budget`, which
-/// clears this by construction); `#[cfg(test)]` keeps non-test builds free
-/// of a dead-code warning.
-#[cfg(test)]
+/// quotient `key / capacity` could exceed `u32::MAX` and get silently
+/// truncated by the `as u32` cast in `split()`. That truncation is not
+/// merely "the table gets less useful" -- it breaks the invariant the
+/// whole design leans on ("a `partial_key` match proves exact key
+/// equality"): two genuinely different keys that happen to share the same
+/// low 32 bits of their (truncated) quotient, at the same index, would
+/// alias, and `get()` could hand back one position's score for a
+/// completely different position. `SharedTranspositionTable::with_capacity`
+/// enforces this floor by construction (see its call to
+/// `entries.max(MIN_SAFE_CAPACITY)` below) rather than merely documenting
+/// it, precisely because it -- unlike the plain `TranspositionTable` below,
+/// see its own doc comment -- is reachable from a CLI flag
+/// (`tools/gen_book.rs`'s `--tt-mb`) with real ~49-bit `Position` keys on
+/// the other end.
 const MIN_SAFE_CAPACITY: usize = 1 << 18;
 
 /// A fixed-size, open-addressed transposition table.
@@ -131,6 +140,26 @@ impl TranspositionTable {
     /// for tests deliberately built small to exercise collision behaviour
     /// with tiny synthetic keys, but any table backing a real search
     /// should stay at or above the default 64 MB budget.
+    ///
+    /// **Deliberately NOT clamped to `MIN_SAFE_CAPACITY` the way
+    /// `SharedTranspositionTable::with_capacity` is (see that type's doc
+    /// comment for the risk both share).** Two things make this safe as
+    /// shipped, both checked directly rather than assumed: (1) every
+    /// production/WASM code path constructs this table only via
+    /// `Solver::new`, which always calls `with_byte_budget(
+    /// DEFAULT_BYTE_BUDGET)` -- a fixed 64 MB, ~8.4M slots, far above the
+    /// floor -- never a caller-chosen size; `Solver::with_tt` (the only
+    /// other way to inject a capacity) has no caller anywhere in this
+    /// crate or `tools/` today. (2) Every existing small-capacity use is
+    /// this module's own test suite, deliberately exercising collision
+    /// behaviour with small synthetic keys (`1`, `2`, `5`, `42`, ...) far
+    /// below the ~49-bit range where truncation could alias -- exactly the
+    /// documented contract above. Unlike `SharedTranspositionTable`, no CLI
+    /// flag or other external input reaches this constructor's `entries`
+    /// argument with a real `Position::key()` on the other end, so there is
+    /// no live path to the wrong-score risk today. If a future caller ever
+    /// changes that (e.g. a CLI flag reusing `with_tt` for a real search),
+    /// it would need the same floor `SharedTranspositionTable` now has.
     pub fn with_capacity(entries: usize) -> Self {
         let capacity = smallest_prime_at_least(entries.max(2));
         TranspositionTable {
@@ -244,6 +273,18 @@ fn unpack_word(word: u64) -> (u32, i8, Kind) {
 /// `Ordering::Relaxed` -- no other field, no second word, nothing split
 /// across two atomics that could be observed half-updated.
 ///
+/// **Precondition this argument depends on, and how it's guaranteed, not
+/// assumed:** point 2 below requires `capacity >= MIN_SAFE_CAPACITY`, or
+/// the `partial_key = key / capacity` quotient can itself overflow `u32`
+/// and get silently truncated -- which would let two genuinely different
+/// keys alias. This is enforced BY CONSTRUCTION: every constructor
+/// (`with_capacity`, `with_byte_budget`) clamps up to that floor, so a
+/// `SharedTranspositionTable` value can never exist below it. This is not
+/// merely documented or merely tested -- it cannot be constructed any other
+/// way (see `with_capacity`'s doc comment for why this matters specifically
+/// for this type, reachable from `--tt-mb`, and not for the plain
+/// `TranspositionTable`).
+///
 /// 1. **No torn reads are structurally possible.** An `AtomicU64` load or
 ///    store lowers to one atomic machine instruction. A concurrent reader
 ///    can only ever observe some word that was actually, wholly, written by
@@ -252,10 +293,13 @@ fn unpack_word(word: u64) -> (u32, i8, Kind) {
 ///    a failure mode this design has to defend against at all -- it cannot
 ///    happen, not merely "is made unlikely".
 /// 2. **A `partial_key` match is proof of exact key equality, not a
-///    probabilistic hash match.** `index = key % capacity`,
-///    `partial_key = key / capacity` is exact Euclidean division (see the
-///    module doc comment above): `partial_key as u64 * capacity + index ==
-///    key` losslessly, for any key. So if `get(key)` finds a slot whose
+///    probabilistic hash match -- GIVEN the floor above holds.**
+///    `index = key % capacity`, `partial_key = key / capacity` is exact
+///    Euclidean division (see the module doc comment above):
+///    `partial_key as u64 * capacity + index == key` losslessly, for any
+///    key up to the ~2^50 bound `Position::key()` is bounded by, precisely
+///    because `capacity >= MIN_SAFE_CAPACITY` guarantees the quotient fits
+///    in `u32` without truncation. So if `get(key)` finds a slot whose
 ///    `partial_key` doesn't match, that slot provably holds a *different*
 ///    key's entry (overwritten by another thread since), and `get` reports
 ///    a clean miss (`None`) -- never that other position's score
@@ -288,9 +332,21 @@ pub struct SharedTranspositionTable {
 }
 
 impl SharedTranspositionTable {
-    /// Build a table with a prime slot count at least `entries`.
+    /// Build a table with a prime slot count at least `entries`, clamped up
+    /// to at least `MIN_SAFE_CAPACITY`. The clamp is load-bearing, not a
+    /// convenience: below that floor, `partial_key: u32` can no longer
+    /// losslessly hold `key / capacity` for a real `Position::key()`, which
+    /// breaks the "a `partial_key` match proves exact key equality"
+    /// invariant this whole table's safety argument depends on (see the
+    /// struct doc comment above and `MIN_SAFE_CAPACITY`'s own comment) --
+    /// a genuine wrong-score risk, not merely wasted work, since this type
+    /// (unlike the plain `TranspositionTable`) is reachable from
+    /// `tools/gen_book.rs`'s `--tt-mb` CLI flag with real ~49-bit keys on
+    /// the other end. Enforced HERE, at the table layer, rather than only
+    /// at the CLI, so every construction path (including any future
+    /// caller) is safe by construction, not by the caller's discipline.
     pub fn with_capacity(entries: usize) -> Self {
-        let capacity = smallest_prime_at_least(entries.max(2));
+        let capacity = smallest_prime_at_least(entries.max(MIN_SAFE_CAPACITY));
         let slots = (0..capacity).map(|_| AtomicU64::new(0)).collect();
         SharedTranspositionTable {
             slots,
@@ -485,20 +541,24 @@ mod tests {
 
     #[test]
     fn shared_table_colliding_key_overwrites_rather_than_panics() {
-        // capacity(1) rounds up to the smallest prime >= 2, i.e. 2 slots.
-        // Keys 1 and 3 both land on index `1` (`1 % 2 == 3 % 2 == 1`) with
-        // different quotients (`partial_key`s 0 and 1), so this is a
-        // genuine forced collision, not merely two keys that happen not to
-        // collide.
+        // `with_capacity(1)` is now clamped up to `MIN_SAFE_CAPACITY` (see
+        // the audit fix), so this no longer produces a 2-slot table --
+        // force a genuine collision at whatever prime capacity actually
+        // results instead of assuming a specific small number. Keys `1`
+        // and `1 + capacity` always land on the SAME index (`% capacity`)
+        // with different quotients (`partial_key`s `0` and `1`), so this
+        // stays a real forced collision regardless of capacity.
         let tt = SharedTranspositionTable::with_capacity(1);
-        assert_eq!(tt.capacity(), 2);
-        tt.insert(1, Bound::Exact(1));
-        tt.insert(3, Bound::Exact(2));
-        assert_eq!(tt.get(3), Some(Bound::Exact(2)));
+        assert!(tt.capacity() >= MIN_SAFE_CAPACITY);
+        let key_a = 1u64;
+        let key_b = 1u64 + tt.capacity;
+        tt.insert(key_a, Bound::Exact(1));
+        tt.insert(key_b, Bound::Exact(2));
+        assert_eq!(tt.get(key_b), Some(Bound::Exact(2)));
         // The first key's slot was reused by the second key, so a lookup
         // for it must be a clean miss (partial_key mismatch), never the
         // wrong position's score.
-        assert_eq!(tt.get(1), None);
+        assert_eq!(tt.get(key_a), None);
     }
 
     #[test]
@@ -517,6 +577,63 @@ mod tests {
             let (index, partial_key) = tt.split(key);
             let reconstructed = (partial_key as u64) * tt.capacity + (index as u64);
             assert_eq!(reconstructed, key, "key {key:#x} did not round-trip through split()");
+        }
+    }
+
+    /// Post-Wave-7.1-audit fix: `with_capacity` must clamp a too-small
+    /// request UP to `MIN_SAFE_CAPACITY`, not honour it verbatim -- this is
+    /// the enforcement half of the fix (the round-trip test below is the
+    /// "and it actually prevents the bug" half).
+    #[test]
+    fn shared_table_with_capacity_clamps_a_tiny_request_up_to_the_safe_floor() {
+        for tiny in [0usize, 1, 2, 10, 1000] {
+            let tt = SharedTranspositionTable::with_capacity(tiny);
+            assert!(
+                tt.capacity() >= MIN_SAFE_CAPACITY,
+                "requested {tiny}, got capacity {} which is below MIN_SAFE_CAPACITY ({MIN_SAFE_CAPACITY})",
+                tt.capacity()
+            );
+        }
+    }
+
+    #[test]
+    fn shared_table_with_byte_budget_clamps_a_tiny_budget_up_to_the_safe_floor() {
+        // 1 byte requests essentially nothing; without the floor this would
+        // round down to a capacity of 1 or 2 slots.
+        let tt = SharedTranspositionTable::with_byte_budget(1);
+        assert!(tt.capacity() >= MIN_SAFE_CAPACITY);
+    }
+
+    /// The concrete bug this wave's audit finding was about: at a small
+    /// enough capacity, `partial_key = key / capacity` overflows `u32` and
+    /// gets silently truncated by the `as u32` cast, so two DIFFERENT real
+    /// ~49-bit keys can alias to the identical `(index, partial_key)` pair
+    /// -- a wrong-score risk, not merely wasted work. This test uses keys
+    /// near the documented ~2^50 bound and a deliberately tiny REQUESTED
+    /// capacity (`10`, far below the floor) to prove the clamp actually
+    /// prevents the aliasing, not just that `capacity()` reports a big
+    /// number.
+    #[test]
+    fn shared_table_round_trips_realistic_keys_even_when_constructed_with_a_tiny_requested_capacity() {
+        let tt = SharedTranspositionTable::with_capacity(10);
+        assert!(tt.capacity() >= MIN_SAFE_CAPACITY, "clamp did not apply");
+
+        let realistic_keys: Vec<(u64, i32)> = vec![
+            ((1u64 << 49) - 1, 17),
+            ((1u64 << 49) + 12345, -3),
+            (0x1FF_FFFF_FFFF, 0),
+            (0x3F_FFFF_FFFF, -18),
+        ];
+        for (key, value) in &realistic_keys {
+            tt.insert(*key, Bound::Exact(*value));
+        }
+        for (key, value) in &realistic_keys {
+            assert_eq!(
+                tt.get(*key),
+                Some(Bound::Exact(*value)),
+                "key {key:#x} did not round-trip -- a small requested capacity likely let its \
+                 partial_key quotient overflow u32 and alias with another key"
+            );
         }
     }
 

@@ -183,6 +183,18 @@ way before signature (recommendation: fix both now — each is small,
 web-only, and the same honesty/design class this phase existed to
 close). Awaiting owner signature; Phase 3 does not begin until given.
 
+**OWNER RULED 2026-07-29: both fixed BEFORE signature.** Wave 10.1
+delegated (web-ui): (1) win-line overlay per §9, line half; (2) parity
+ruler hides on game over; (3) SPEC §3.2 scope clarification WRITTEN
+and committed (`1109a30`) — terminal-beats-analysis covers every
+analysis-derived surface, phrased generally so the next surface added
+doesn't reproduce the defect; (4) owner-ordered class sweep: audit
+every analysis-derived surface for terminal survival (this is the
+SECOND defect class to recur in a new file, after red-as-user — the
+sweep is the countermeasure). Then verifier pass with live screenshots
+(ruler absent on a won game, win line rendered), then deploy, then
+signature.
+
 - **Wave 7.2 — DIAGNOSED 2026-07-28, no engine code at fault, zero
   source changes.** Root causes, measured: (1) PRIMARY — external
   contention on a heavily shared machine (load avg 17→84 during the

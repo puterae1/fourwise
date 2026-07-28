@@ -77,6 +77,62 @@ describe('exportGameState / import round trip (SPEC §5 amendment)', () => {
     expect(outcome.games[0]!.setupPrefix).toBe('44');
     expect(outcome.games[0]!.moves).toEqual([{ column: 1, partial: true }, { column: 2 }]);
   });
+
+  it('round trip preserves a move\'s origin ("tactical") intact, not just its partial flag', () => {
+    const original: GameState = {
+      seat: SEAT,
+      mode: 'play',
+      setupPrefix: '',
+      moves: [{ column: 3, partial: true, origin: 'tactical' }, { column: 2 }],
+      currentPly: 2,
+    };
+    const envelope = exportGameState(original);
+    expect(envelope.games[0]!.moves).toEqual([{ column: 3, partial: true, origin: 'tactical' }, { column: 2 }]);
+
+    const outcome = parseImportFile(JSON.stringify(envelope));
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.games[0]!.moves).toEqual([{ column: 3, partial: true, origin: 'tactical' }, { column: 2 }]);
+  });
+
+  it('round trip preserves a move\'s origin ("centre-fallback") intact', () => {
+    const original: GameState = {
+      seat: SEAT,
+      mode: 'play',
+      setupPrefix: '',
+      moves: [{ column: 5, partial: true, origin: 'centre-fallback' }],
+      currentPly: 1,
+    };
+    const envelope = exportGameState(original);
+    expect(envelope.games[0]!.moves).toEqual([{ column: 5, partial: true, origin: 'centre-fallback' }]);
+
+    const outcome = parseImportFile(JSON.stringify(envelope));
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.games[0]!.moves).toEqual([{ column: 5, partial: true, origin: 'centre-fallback' }]);
+  });
+});
+
+describe('parseImportFile -- an invalid origin string is an honest rejection, not a silently-dropped field', () => {
+  it('rejects a move with an unrecognised origin value (e.g. "banana") as an invalid move list, never a crash or a silent drop', () => {
+    const envelope = {
+      version: CURRENT_EXPORT_VERSION,
+      exported: 'x',
+      games: [
+        {
+          seat: SEAT,
+          setupPrefix: '',
+          moves: [{ column: 3, partial: true, origin: 'banana' }],
+          date: 'x',
+        },
+      ],
+    };
+    const outcome = parseImportFile(JSON.stringify(envelope));
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.reason).toBe('invalid-shape');
+    expect(outcome.message).toMatch(/invalid move list/i);
+  });
 });
 
 describe('parseImportFile -- three distinct, honest failure modes (SPEC §5 amendment)', () => {

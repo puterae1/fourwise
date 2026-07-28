@@ -150,8 +150,13 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
   + safety argument must be stated); serial-vs-parallel BYTE-IDENTICAL
   book on a deterministic subset (via --max-positions; concurrency
   corruption is invisible to downstream checks, which test the book
-  against itself); throughput re-measured with a real positions/sec
-  probe before done. Also: time-based progress/ETA lines every ≤60 s;
+  against itself — **owner amendment 2026-07-28: the parallel side runs
+  3–5 times against the one deterministic serial baseline, every run
+  byte-identical (a 1-in-20 race passes a single run), and at least one
+  run oversubscribed at --threads 2–3× cores, where lock-free flaws
+  actually surface; any single differing byte = stop, keep both files,
+  report diff offsets**); throughput re-measured with a real
+  positions/sec probe before done. Also: time-based progress/ETA lines every ≤60 s;
   --threads flag; zero new dependencies; checkpoint stays flush-per-line
   and line-atomic under concurrent writers. engine/src will change for
   the shared table (first change since gate state) → after verifier

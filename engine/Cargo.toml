@@ -10,3 +10,7 @@ crate-type = ["cdylib", "rlib"]
 wasm-bindgen = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde-wasm-bindgen = "0.6"
+
+[[bin]]
+name = "gen_book"
+path = "../tools/gen_book.rs"

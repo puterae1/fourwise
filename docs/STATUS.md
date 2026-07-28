@@ -348,5 +348,65 @@ text was lost in a context handover. Kept as record of what each wave covered:
     Safari (Workers/wasm-init/localStorage quirks — everything so far is
     Chrome-only); then orchestrator judgement, then owner sign-off.
 
-Phases 2–3 wave breakdowns get written here when Phase 1's gate passes.
+## Phase 2 wave plan (PLAN OF RECORD — owner-approved 2026-07-28, with
+three rulings folded in)
+
+Scope: ROADMAP Phase 2 (opening book) + the three post-gate defects
+(SPEC §3.1 tactical fallback, §3.1 level-label honesty, §3.2 terminal
+display). Owner rulings shaping this plan:
+
+1. **Generation runs on the owner's machine, overnight, DETACHED** —
+   `nohup`, progress to a log file, never inside a Claude Code session
+   that can die and take hours of compute with it. (The 2-core GitHub
+   runner took 90+ min on fixtures the M-series did in 32, and a
+   multi-hour job risks the 6-hour job ceiling.) TT for the generation
+   run goes WELL above 64 MB (one-off run, 24 GB machine; TT hit rate is
+   the whole ballgame across tens of thousands of overlapping openings).
+2. **Verification targets the write/read boundary, not the solver.**
+   A cold-TT re-solve inside the generator only proves the solver agrees
+   with itself — already fixture-proven. The bite risks are binary
+   serialisation, mirror normalisation asymmetry between write and read,
+   and key collisions. So: sampling must read the serialised file through
+   `book.rs`'s REAL loader. Split across waves — Wave 7 generates and
+   logs the sample set (≥1,000, seeded) with expected scores; Wave 8
+   replays that sample through the loader and asserts agreement. Gate
+   criterion 2's evidence spans both waves by design.
+3. **The tactical fallback must be tested in its own use case.** Once the
+   book lands it almost never fires in the opening — precisely where it
+   was built for. Wave 8 requires explicit tests with the book ABSENT,
+   plus a book-disabled flag kept permanently so the path can be
+   exercised deliberately.
+
+- **Wave 7 — book generator** (`rust-engine`): `tools/gen_book.rs` wired
+  as a bin of the engine crate. Depth-8 enumeration (all reachable
+  non-terminal positions, ply 0–8), exact solve each, mirror dedup
+  (canonical = min(key, mirror-key), rule documented in ENGINE.md for
+  Wave 8 to implement from the doc). Format decision (orchestrator):
+  versioned header + sorted full-u64-key array + parallel i8 scores,
+  binary-search lookup — no hashing, no truncated keys, killing the
+  collision class outright. CLI: --depth/--out/--tt-mb/--verify-sample/
+  --seed/--resume; resumable via checkpoint, kill-9-safe. Sample artifact
+  (moves + key + score, JSON in engine/tests/fixtures/) records MOVE
+  SEQUENCES so Wave 8 recomputes keys independently. Done = tests +
+  clippy clean + depth-4 end-to-end rehearsal + independent brute-force
+  enumerator cross-check at small depth. Then, post-verifier: the
+  detached depth-8 overnight run per ruling 1.
+- **Wave 8 — engine integration + tactical fallback** (`rust-engine`):
+  `engine/src/book.rs` loader (validate, mirror-normalised lookup),
+  consulted before search; wasm export to inject book bytes; corrupt or
+  absent book → plain search, never a panic or user-visible error; replay
+  Wave 7's sample file through the real loader (gate #2 evidence);
+  amended §3.1 tactical fallback (complete fixed-depth search on cap
+  expiry) with book-absent tests + permanent book-disabled flag.
+- **Wave 9 — web integration + honesty fixes** (`web-ui`): fetch book on
+  load without blocking first paint, hand bytes to the worker,
+  fetch-failure degrades silently to plain search (tested); level-label
+  qualification at its own surface (§3.1); terminal-display-beats-
+  analysis-display (§3.2).
+- **Wave 10 — gate** (`verifier` + owner): ROADMAP Phase 2 criteria on
+  the deployed artifact — openings < 50 ms, sample verification evidence
+  (Waves 7+8), graceful degradation — plus the three known defects
+  confirmed closed.
+
+Phase 3's wave breakdown gets written here when Phase 2's gate passes.
 Phase 4 remains unsanctioned (`docs/ROADMAP.md`).

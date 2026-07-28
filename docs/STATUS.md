@@ -149,8 +149,18 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
   get a throughput/utilisation floor in their audit criteria from now
   on.** Launch-script changes, if any, go through the orchestrator.
 
+- **Wave 9 — delegated 2026-07-28, running** (`web-ui`): book fetch
+  (BASE_URL-aware, non-blocking, silent degrade — the absent-book path
+  is the live state until generation completes), tactical fallback
+  wired into cap expiry per amended §3.1 (closes defect #1),
+  level-label qualification at its own surface (§3.1, defect #2),
+  terminal-display-beats-analysis (§3.2, defect #3), set_book_enabled
+  passthrough (no UI), stale-race + mutation-tested, headless-Chrome
+  screenshots required.
+
 - **Wave 8 — verifier PASS 2026-07-28 (8/8), committed `9050e0c`;
-  post-audit punch list with implementer (doc/string only).**
+  punch list COMPLETE, committed `6736a70` (ENGINE.md wasm-shape +
+  format pins; invocation strings fixed and re-run).**
   Audit highlights beyond the checklist: verifier constructed its own
   adversarial corrupt books (one-byte-short header, count=0+body,
   keys-short-by-one) — all cleanly rejected; hand-played the TRAP_ROOT

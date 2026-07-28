@@ -102,6 +102,32 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
 
 ## In flight
 
+- **Wave 7.1 — code COMPLETE 2026-07-28, committed `06e5a31`, verifier
+  re-audit RUNNING.** Implementer report highlights: shared lock-free
+  `SharedTranspositionTable` (each entry one packed AtomicU64 word,
+  Relaxed ordering; index = key % prime capacity, partial_key = key /
+  capacity — exact Euclidean reconstruction, a match proves key equality;
+  safety comment at the struct: torn reads structurally impossible,
+  partial-key mismatch is a provable miss, stale hits are still proven
+  bounds → races waste probes, never corrupt scores). Solver gets a
+  private TtHandle dispatch — negamax body byte-unchanged, public API
+  unchanged, runtime/wasm path untouched. gen_book: work-stealing atomic
+  cursor, single small mutex around checkpoint-write+bookkeeping,
+  time-based ≤60 s progress/ETA lines, --threads/--max-positions/
+  --sample-out. Evidence per owner amendment: serial baseline + FIVE
+  parallel runs (threads 10,10,15,20,30 — 2-3× the 10 cores) ALL
+  byte-identical (cmp + SHA-256). Sample-JSON scores identical; move
+  sequences differ across runs via pre-existing HashMap-iteration-order
+  nondeterminism in enumerate/canonicalize (multiset-verified same
+  position; book stores key+score only — zero book impact; noted for
+  Wave 8 awareness). Throughput: 2.66 pos/s CONTENDED (probe overlapped
+  the serial evidence run) vs 0.25-0.4 serial → ~6.6-10.6× on 10 cores;
+  depth-8 extrapolation ~13.5 h, likely better uncontended. Tests
+  77→94, clippy clean, three mutation classes each caught by named
+  tests (one real test-hang risk found and fixed en route). Next:
+  verifier PASS → re-dispatch release-fixtures CI (engine/src changed:
+  tt.rs +364, solver.rs +62/-4) → owner launches via ~/fourwise-launch.sh.
+
 - **Wave 7 — code COMPLETE, verifier PASS 2026-07-28 (10/10), committed
   `1a54f72`. Depth-8 production run CLEARED for launch (owner's shell).**
   Verifier highlights: suites clean (77 tests, clippy `-D warnings` no

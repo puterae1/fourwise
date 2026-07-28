@@ -113,13 +113,26 @@
   claimed, but analysis-dependent DOM rendering had no coverage — the
   responding-fake pattern now exists; lamp DOM test assigned to 5b.
 
+- **Wave 5b — plumbing: COMPLETE, verifier PASS 2026-07-28 (8/8).**
+  Game-state persistence (legality-gated restore replaying through the
+  real dropDisc; corrupt anything → fresh game, never a crash; partial
+  badges survive the round-trip — browser-verified), versioned export
+  envelope `{version, exported, games[]}` with three distinct honest
+  import rejections (mutation-tested by implementer; verifier independently
+  judged assertions mutation-sensitive), desktop rail driven by the
+  litColumn signal with zero mode inspection, lamp-reveal DOM test closing
+  the 4b coverage hole, seatStorage corrupt tests, comment cleanup.
+  **OWNER RULING PENDING:** importing a file permanently overwrites the
+  persisted `fourwise:seat` preference (via the pre-existing saveSeat
+  effect), not just the active session — verifier proved it empirically;
+  no test pins it either way. Committed as-is; adjust on ruling.
+  Also carried to 6a: default side controls are per-colour (yellow=engine)
+  — a first-run user choosing yellow watches the engine play their colour;
+  fix to by-role defaults (user=human).
+
 ## In flight
 
-Next: **Wave 5b — plumbing**: game-state persistence, versioned JSON
-export/import (envelope `{version, exported, games[]}`, three distinct
-import rejections), desktop rail per §8.4 (re-sorts on REVEAL, whenever
-reveal happens, not on mode), lamp-reveal DOM test, corrupt-stored-seat
-test, stale calibration comment.
+Next: **Wave 6a** — quality floor + perf smoke against the pinned gate #3.
 
 ## Ownership
 
@@ -173,10 +186,25 @@ Waves 3 and 4 are complete (see Done). Remaining:
   seat slice landed early with the first-run prompt), desktop rail per
   DESIGN-DIRECTION §8.4 (Play ranked from start, Analyse re-sorts only
   after Show me — wording pre-verified against the §14.1 override).
-- **Wave 6** (`web-ui` + `verifier`): accessibility (keyboard, reduced motion,
-  one-handed portrait), mobile performance (< 1 s mid-game analysis on a
-  mid-range phone), GitHub Actions → Pages deploy. Then a full `verifier`
-  audit of all five gate criteria; orchestrator judges the gate.
+- **Wave 6** (`web-ui` + `verifier` + owner), three parts, sharpened
+  2026-07-28:
+  - **6a — quality floor + perf smoke:** keyboard/a11y audit per SPEC §4/§6;
+    mobile perf measured against gate #3 AS PINNED in ROADMAP (ply ≥ 12
+    under 1 s on-device; below ply 12 "still thinking" is correct
+    behaviour). Desk numbers via CPU-throttled headless Chrome are a smoke
+    test only, bar deliberately tightened to 400 ms (throttling is a poor
+    WASM proxy — bandwidth-sensitive 64 MB TT).
+  - **6b — deploy:** Actions workflow (wasm-pack + vite + Pages, debug
+    engine tests per push, 30-min release fixture run as manual dispatch);
+    repo-public decision is DELIBERATE, not a switch-flip: history scanned
+    clean 2026-07-28 (no secrets); going public exposes .claude/ (agents,
+    settings), ORCHESTRATION.md (quota strategy), STATUS.md (decision
+    history), CAMERA.md, OPPONENT-MODEL.md — owner reviews the inventory
+    before the flip.
+  - **6c — the gate:** verifier audits all five ROADMAP criteria with
+    evidence on the DEPLOYED artifact; real-phone check including mobile
+    Safari (Workers/wasm-init/localStorage quirks — everything so far is
+    Chrome-only); then orchestrator judgement, then owner sign-off.
 
 Phases 2–3 wave breakdowns get written here when Phase 1's gate passes.
 Phase 4 remains unsanctioned (`docs/ROADMAP.md`).

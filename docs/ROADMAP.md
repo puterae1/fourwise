@@ -31,7 +31,20 @@ reference site.
    original wording — "identical engine evaluation across all four" — is
    structurally guaranteed, cannot fail, and proves nothing; seat is not an
    engine input.)
-3. Any reachable mid-game position analyses in under 1s on a mid-range phone.
+3. Mid-game responsiveness — **definition pinned 2026-07-28, owner-approved,
+   before any Wave 6 measurement existed to bias it**: any reachable position
+   at ply 12 or beyond analyses to completion in under 1 s on a mid-range
+   phone. Below ply 12, deep-opening solves are explicitly Phase 2's problem
+   (ENGINE.md stop-condition amendment) and the progressive "still thinking"
+   state is the CORRECT behaviour there, not a gate failure. Read literally,
+   the original wording ("any reachable mid-game position") included ply-6
+   positions that take minutes without the opening book — a bar no search
+   alone can meet and one this project's own amendments already declined.
+   Measurement protocol: desk numbers (CPU-throttled headless Chrome) are a
+   smoke test only, with a deliberately tighter bar of 400 ms — throttled
+   desktop Chrome is a poor proxy for mobile WASM (memory bandwidth, JIT;
+   the 64 MB TT is bandwidth-sensitive). The gate evidence is a real phone
+   on the deployed URL, including mobile Safari.
 4. Keyboard-navigable, reduced-motion respected, usable one-handed in portrait.
 5. Deployed and loading from the GitHub Pages URL.
 

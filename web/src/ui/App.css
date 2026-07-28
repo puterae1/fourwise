@@ -45,9 +45,53 @@
   min-height: 64px;
 }
 
+.page__import-input {
+  /* Hidden trigger for the native file picker (design §5 amendment) --
+   * visually hidden, not `display: none`, so it stays in the accessible
+   * tree and focusable via the "Import" button's programmatic click. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.page__import-error {
+  margin: 0 var(--gutter);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-n-0);
+  border-left: 3px solid var(--c-n-9);
+  border-radius: var(--r-sm);
+  font-size: var(--t-body-size);
+  color: var(--c-ink);
+}
+
+.page__layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.page__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
 @media (min-width: 900px) {
   .page {
     max-width: 1180px;
     padding: 0 var(--gutter) var(--sp-6);
+  }
+
+  .page__layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .page__main {
+    flex: 1 1 auto;
   }
 }

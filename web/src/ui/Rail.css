@@ -1,0 +1,134 @@
+/* Desktop rail — docs/DESIGN-DIRECTION.md §8.4. Only ever rendered at
+ * >=900px (`App.tsx` gates it on `isDesktopLayout`), so this file has no
+ * narrow-viewport rules of its own. */
+
+.rail {
+  flex: 0 0 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  background: var(--c-n-0);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3);
+}
+
+.rail__verdicts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rail__verdict-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-sm);
+  min-height: 32px;
+}
+
+.rail__verdict-bar {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-sm);
+  background: var(--c-n-9);
+  flex: 0 0 auto;
+}
+
+.rail__verdict-bar[data-kind='draw'] {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--c-n-9),
+    var(--c-n-9) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+}
+
+.rail__verdict-bar[data-kind='loss'] {
+  background: transparent;
+  border: 2px solid var(--c-n-9);
+  box-sizing: border-box;
+}
+
+.rail__verdict-bar[data-kind='full'],
+.rail__verdict-bar[data-kind='unknown'] {
+  background: var(--c-n-2);
+}
+
+.rail__verdict-column {
+  font-family: var(--f-display);
+  font-weight: var(--w-title);
+  font-size: var(--t-body-size);
+  width: 1.5em;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+.rail__verdict-sentence {
+  font-family: var(--f-body);
+  font-size: var(--t-body-size);
+  color: var(--c-ink);
+}
+
+.rail__moves-title {
+  font-family: var(--f-display);
+  font-weight: var(--w-title);
+  font-size: var(--t-label-size);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-n-5);
+  margin-bottom: var(--sp-2);
+}
+
+.rail__move-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.rail__move-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  appearance: none;
+  border: none;
+  background: none;
+  padding: var(--sp-2);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-family: var(--f-body);
+  font-size: var(--t-body-size);
+  min-height: 40px;
+}
+
+.rail__move-row[data-current='true'] {
+  background: var(--c-frame);
+  color: var(--c-n-0);
+}
+
+.rail__move-row:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: -2px;
+}
+
+.rail__move-ply {
+  font-size: var(--t-micro-size);
+  color: var(--c-n-5);
+  width: 1.5em;
+  flex: 0 0 auto;
+}
+
+.rail__move-row[data-current='true'] .rail__move-ply {
+  color: var(--c-n-2);
+}
+
+.rail__move-partial {
+  font-size: var(--t-micro-size);
+  color: var(--c-n-5);
+  margin-left: auto;
+}

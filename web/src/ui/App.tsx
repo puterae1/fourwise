@@ -3,13 +3,14 @@
 // mode-dependent action slot below it, the mode switch pinned at the
 // bottom (design §8).
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useEngineClient } from './useEngineClient.js';
 import { useGameController, opponentColourOf } from './useGameController.js';
 import { useSetupEditor } from './useSetupEditor.js';
 import { SeatControls } from './SeatControls.js';
 import { SeatPrompt } from './SeatPrompt.js';
 import { loadStoredSeat, saveSeat } from './seatStorage.js';
+import { loadStoredGame, saveGame } from './gameStorage.js';
 import { ModeSwitch } from './ModeSwitch.js';
 import { HeadlineSlot } from './HeadlineSlot.js';
 import { Board } from './Board.js';
@@ -17,6 +18,7 @@ import { PlayPanel } from './PlayPanel.js';
 import { AnalysePanel } from './AnalysePanel.js';
 import { SetupPanel } from './SetupPanel.js';
 import { MoveList } from './MoveList.js';
+import { Rail, isDesktopLayout } from './Rail.js';
 import { isColumnFull } from './deriveBoard.js';
 import { canShowParityRuler } from './ParityRuler.js';
 import { useViewportWidth } from './useViewportWidth.js';
@@ -30,7 +32,9 @@ import {
   turnContextLine,
 } from './copy.js';
 import { userMovesFirst, type Seat } from '../game/seat.js';
+import type { GameState } from '../game/gameState.js';
 import { parityRows } from '../game/parity.js';
+import { exportGameState } from '../game/exportFormat.js';
 import type { TranslatedAnalysis } from '../game/verdict.js';
 import './App.css';
 
@@ -52,7 +56,13 @@ function App() {
   // starts the real game immediately -- no prompt render, no flash. `null`
   // means the prompt is up and `chosenSeat` stays `null` until Start.
   const [chosenSeat, setChosenSeat] = useState<Seat | null>(() => loadStoredSeat());
-  const controller = useGameController(client, chosenSeat);
+  // SPEC §5, "current game survives a refresh". Read once at mount, same
+  // pattern as `chosenSeat` above -- `useGameController` reconciles this
+  // against whichever seat is actually in force (`reconcileGameSeat`), so
+  // the two independently-persisted keys (`fourwise:seat`, `fourwise:game`)
+  // can never disagree about whose seat the restored game is playing under.
+  const [restoredGame] = useState<GameState | null>(() => loadStoredGame());
+  const controller = useGameController(client, chosenSeat, restoredGame);
 
   // `useSetupEditor`, the mode-transition ref and the keyboard listener
   // below all need *some* colour pair to stay hooks-unconditional while the
@@ -62,6 +72,9 @@ function App() {
   const setup = useSetupEditor(controller?.seat.firstMover ?? 'red', controller?.seat.userColour ?? 'red');
   const prevModeRef = useRef(controller?.mode ?? 'play');
   const [moveListOpen, setMoveListOpen] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const showRail = isDesktopLayout(viewportWidth);
 
   // Persist the seat (SPEC §5, "seat preference remembered") on every
   // change -- the prompt's own Start handler covers the very first write,
@@ -69,6 +82,14 @@ function App() {
   useEffect(() => {
     if (controller) saveSeat(controller.seat);
   }, [controller?.seat]);
+
+  // Persist the current game (SPEC §5, "current game survives a refresh")
+  // on every change -- moves, undo/redo, jump-to-ply, mode switches, and a
+  // fresh Setup-derived game all funnel through `controller.game`, so one
+  // effect here covers every one of them.
+  useEffect(() => {
+    if (controller) saveGame(controller.game);
+  }, [controller?.game]);
 
   // Setup mode is a fresh edit every time it's entered (see useSetupEditor's
   // own comment) -- reset when the mode transitions INTO setup, not on
@@ -134,6 +155,37 @@ function App() {
   }
 
   const opponentColour = opponentColourOf(controller.seat);
+
+  // ---- export / import (SPEC §5 amendment) ---------------------------
+  // Export = download; import = file picker. No network calls anywhere
+  // (CLAUDE.md invariant #3) -- both go through a plain `Blob`/`<a download>`
+  // and a hidden `<input type="file">`, entirely client-side.
+  function handleExport() {
+    const envelope = exportGameState(controller!.game);
+    const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fourwise-game-${envelope.exported.replace(/[:.]/g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImportClick() {
+    setImportError(null);
+    importInputRef.current?.click();
+  }
+
+  async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = ''; // allow re-picking the same filename later
+    if (!file) return;
+    const text = await file.text();
+    const result = controller!.importGame(text);
+    setImportError(result.ok ? null : result.message);
+  }
 
   // ---- headline slot ------------------------------------------------
   let contextLine: string | undefined;
@@ -210,75 +262,110 @@ function App() {
           >
             Markers {controller.markersOn ? 'on' : 'off'}
           </button>
+          <button type="button" className="page__utility-button" onClick={handleExport}>
+            Export
+          </button>
+          <button type="button" className="page__utility-button" onClick={handleImportClick}>
+            Import
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json"
+            aria-label="Import game file"
+            className="page__import-input"
+            onChange={handleImportFile}
+          />
         </div>
       </header>
 
-      <SeatControls
-        userColour={controller.seat.userColour}
-        firstMover={controller.seat.firstMover}
-        onUserColourChange={controller.setUserColour}
-        onFirstMoverChange={controller.setFirstMover}
-      />
+      {importError && (
+        <p className="page__import-error" role="alert">
+          {importError}
+        </p>
+      )}
 
-      <HeadlineSlot
-        contextLine={contextLine}
-        sentence={sentence}
-        variant={variant}
-        onDismiss={variant === 'blunder' ? controller.dismissBlunder : undefined}
-      />
-
-      <Board
-        grid={boardGrid}
-        winLine={boardWinLine}
-        turnColour={controller.turnColour}
-        litColumn={controller.litColumn}
-        lastPlayedColumn={boardLastPlayed}
-        onDrop={boardOnDrop}
-        canDrop={boardCanDrop}
-        parityUserRows={parityUserRows}
-      />
-
-      <div className="page__action-slot">
-        {controller.mode === 'play' && (
-          <PlayPanel
+      <div className="page__layout">
+        <div className="page__main">
+          <SeatControls
             userColour={controller.seat.userColour}
-            opponentColour={opponentColour}
-            controls={controller.controls}
-            onControlChange={controller.setControl}
-            levels={controller.levels}
-            onLevelChange={controller.setLevel}
-            onUndo={controller.undo}
-            onRedo={controller.redo}
-            canUndo={controller.canUndo}
-            canRedo={controller.canRedo}
+            firstMover={controller.seat.firstMover}
+            onUserColourChange={controller.setUserColour}
+            onFirstMoverChange={controller.setFirstMover}
           />
-        )}
-        {controller.mode === 'analyse' && (
-          <AnalysePanel
+
+          <HeadlineSlot
+            contextLine={contextLine}
+            sentence={sentence}
+            variant={variant}
+            onDismiss={variant === 'blunder' ? controller.dismissBlunder : undefined}
+          />
+
+          <Board
+            grid={boardGrid}
+            winLine={boardWinLine}
+            turnColour={controller.turnColour}
+            litColumn={controller.litColumn}
+            lastPlayedColumn={boardLastPlayed}
+            onDrop={boardOnDrop}
+            canDrop={boardCanDrop}
+            parityUserRows={parityUserRows}
+          />
+
+          <div className="page__action-slot">
+            {controller.mode === 'play' && (
+              <PlayPanel
+                userColour={controller.seat.userColour}
+                opponentColour={opponentColour}
+                controls={controller.controls}
+                onControlChange={controller.setControl}
+                levels={controller.levels}
+                onLevelChange={controller.setLevel}
+                onUndo={controller.undo}
+                onRedo={controller.redo}
+                canUndo={controller.canUndo}
+                canRedo={controller.canRedo}
+              />
+            )}
+            {controller.mode === 'analyse' && (
+              <AnalysePanel
+                translated={controller.translated}
+                rawColumns={controller.rawColumns}
+                revealed={controller.analyseRevealed}
+                selected={controller.analyseSelected}
+                onSelect={controller.selectAnalyseColumn}
+                onShowMe={controller.showBest}
+                rawScoresOn={controller.rawScoresOn}
+                onToggleRawScores={() => controller.setRawScoresOn(!controller.rawScoresOn)}
+              />
+            )}
+            {controller.mode === 'setup' && (
+              <SetupPanel
+                placing={setup.placing}
+                onPlacingChange={setup.setPlacing}
+                onUndo={setup.undo}
+                onClear={setup.clear}
+                onDone={() => controller.commitSetup(setup.grid, 'play')}
+                canUndo={setup.canUndo}
+                canDone={setup.rejection === null}
+              />
+            )}
+          </div>
+
+          <ModeSwitch mode={controller.mode} onChange={controller.setMode} />
+        </div>
+
+        {showRail && (
+          <Rail
             translated={controller.translated}
-            rawColumns={controller.rawColumns}
-            revealed={controller.analyseRevealed}
-            selected={controller.analyseSelected}
-            onSelect={controller.selectAnalyseColumn}
-            onShowMe={controller.showBest}
-            rawScoresOn={controller.rawScoresOn}
-            onToggleRawScores={() => controller.setRawScoresOn(!controller.rawScoresOn)}
-          />
-        )}
-        {controller.mode === 'setup' && (
-          <SetupPanel
-            placing={setup.placing}
-            onPlacingChange={setup.setPlacing}
-            onUndo={setup.undo}
-            onClear={setup.clear}
-            onDone={() => controller.commitSetup(setup.grid, 'play')}
-            canUndo={setup.canUndo}
-            canDone={setup.rejection === null}
+            showVerdicts={controller.mode !== 'setup'}
+            revealed={controller.litColumn !== null}
+            moveListEntries={controller.moveListEntries}
+            currentPly={controller.game.currentPly}
+            onJump={controller.jumpToPly}
           />
         )}
       </div>
-
-      <ModeSwitch mode={controller.mode} onChange={controller.setMode} />
 
       <MoveList
         open={moveListOpen}

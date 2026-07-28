@@ -26,6 +26,8 @@ import {
   type GameState,
   type Mode,
 } from '../game/gameState.js';
+import { reconcileGameSeat } from '../game/gameStateStorage.js';
+import { parseImportFile, toGameState } from '../game/exportFormat.js';
 import { colourAtPly, otherColour, type Colour, type Seat } from '../game/seat.js';
 import type { Grid } from '../game/setup.js';
 import { translateAnalysis, translateScore, type TranslatedAnalysis, type VerdictKind } from '../game/verdict.js';
@@ -115,6 +117,16 @@ export interface GameController {
   dismissBlunder: () => void;
 
   commitSetup: (grid: Grid, targetMode: 'play' | 'analyse') => { ok: true } | { ok: false; message: string };
+
+  /** JSON import (SPEC §5 amendment) -- parses raw file text end-to-end via
+   * `game/exportFormat.ts` and, on success, REPLACES the current game (and
+   * its seat -- an imported game brings its own, unlike a local-storage
+   * restore, which reconciles against the separately-persisted seat
+   * preference instead; see `reconcileGameSeat`'s own doc comment for why
+   * those two cases differ). Never throws; a failure returns the exact
+   * honest message `exportFormat.ts` produced, one of the three distinct
+   * failure modes (SPEC §5 amendment). */
+  importGame: (fileText: string) => { ok: true } | { ok: false; message: string };
 }
 
 // No fixed default seat (owner ruling, see `SeatPrompt.tsx`): a hardcoded
@@ -130,7 +142,20 @@ export interface GameController {
 // from it -- the placeholder cannot leak past this file.
 const PLACEHOLDER_SEAT: Seat = { firstMover: 'red', userColour: 'red' };
 
-export function useGameController(client: EngineClient | null, initialSeat: Seat | null): GameController | null {
+/**
+ * `initialGame`, if supplied, is a game restored from `localStorage`
+ * (`ui/gameStorage.ts`, SPEC §5 "current game survives a refresh") --
+ * ALREADY reconciled against the seat in force is NOT assumed here; this
+ * hook does that reconciliation itself (`reconcileGameSeat`) the moment
+ * both `initialGame` and `initialSeat` are available, so the two
+ * independently-persisted things (`fourwise:seat` and `fourwise:game`) can
+ * never disagree about whose seat the restored game is playing under.
+ */
+export function useGameController(
+  client: EngineClient | null,
+  initialSeat: Seat | null,
+  initialGame?: GameState | null,
+): GameController | null {
   // `seat` is NOT separate state: `GameState` already carries its own
   // `seat` field (`game/gameState.ts`), and `colourToMove`/`sideToMove`/
   // `absolutePly` all read `state.seat` internally. A standalone `seat`
@@ -138,7 +163,10 @@ export function useGameController(client: EngineClient | null, initialSeat: Seat
   // only source of truth is what makes "changing seat re-renders colours
   // from the same game state, no reset" true by construction rather than
   // by careful bookkeeping.
-  const [game, setGame] = useState<GameState | null>(() => (initialSeat ? createGame(initialSeat, 'play') : null));
+  const [game, setGame] = useState<GameState | null>(() => {
+    if (!initialSeat) return null;
+    return initialGame ? reconcileGameSeat(initialGame, initialSeat) : createGame(initialSeat, 'play');
+  });
 
   // Starts the game the first time `initialSeat` goes from absent to
   // present (the prompt's Start button, or a stored seat arriving after
@@ -155,7 +183,7 @@ export function useGameController(client: EngineClient | null, initialSeat: Seat
   if (initialSeat !== seenInitialSeat) {
     setSeenInitialSeat(initialSeat);
     if (!game && initialSeat) {
-      setGame(createGame(initialSeat, 'play'));
+      setGame(initialGame ? reconcileGameSeat(initialGame, initialSeat) : createGame(initialSeat, 'play'));
     }
   }
 
@@ -462,6 +490,21 @@ export function useGameController(client: EngineClient | null, initialSeat: Seat
     [seat],
   );
 
+  // SPEC §5 amendment: import replaces the whole game, seat included -- an
+  // imported file brings its OWN seat (unlike restoring from `localStorage`,
+  // which reconciles against the seat already in force; see `initialGame`'s
+  // doc comment above). `App.tsx`'s existing `saveSeat`/`saveGame` effects
+  // (keyed on `controller.seat`/`controller.game`) already persist whatever
+  // this sets, with no separate wiring needed here.
+  const importGame = useCallback((fileText: string) => {
+    const outcome = parseImportFile(fileText);
+    if (!outcome.ok) return { ok: false as const, message: outcome.message };
+    const first = outcome.games[0];
+    if (!first) return { ok: false as const, message: 'This file has no games in it.' };
+    setGame(toGameState(first));
+    return { ok: true as const };
+  }, []);
+
   // No seat chosen yet (first-run prompt still up): there is no game to
   // hand back, by construction rather than by convention -- everything
   // above this point used `effectiveGame`/`PLACEHOLDER_SEAT` only to keep
@@ -505,6 +548,7 @@ export function useGameController(client: EngineClient | null, initialSeat: Seat
     blunder: activeBlunder,
     dismissBlunder,
     commitSetup,
+    importGame,
   };
 }
 

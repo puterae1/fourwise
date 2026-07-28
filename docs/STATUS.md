@@ -149,8 +149,32 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
   get a throughput/utilisation floor in their audit criteria from now
   on.** Launch-script changes, if any, go through the orchestrator.
 
-- **Wave 9 — code COMPLETE 2026-07-29, committed `4b3d4eb`, verifier
-  audit RUNNING.** All three post-gate defects implemented: tactical
+- **Wave 9 — verifier PASS 2026-07-29 (9/9), committed `4b3d4eb`; one
+  test-gap micro-fix with implementer.** Verifier evidence was its own,
+  not the implementer's: live headless-Chrome cap-expiry (real wasm, no
+  book) with computed-style readout proving the qualifier legible (11px,
+  coloured, block — not attribute-only); live terminal game with zero
+  "Still solving" across both panels, all cells "Game over — you won";
+  four seat expectations DERIVED independently before reading the test
+  (turn order provably irrelevant to outcome wording); horizon
+  arithmetic re-derived (fair 7+1=8, weak 3+1=4 — tactical sight exactly
+  matches each level's claimed score horizon, mutation-confirmed); four
+  of its own live mutations, each caught. **Tooling finding for Wave 10:
+  `vite preview` CANNOT test the book HTTP-404 path in this repo — it
+  SPA-fallbacks missing assets to 200/HTML AND ignores the /fourwise/
+  base. Real-404 evidence was closed with a plain static server
+  (python3 -m http.server rooted so /fourwise/ maps to dist/), curl-
+  confirmed 404 first: app boots normally, one info line, silent
+  degrade. Use that method at the gate.** Other findings: Move-with-
+  origin round-trip + invalid-origin rejection untested (micro-fix in
+  flight, code correct on inspection); PRE-EXISTING cosmetic flag —
+  the §9 win-line overlay did not visibly render on the terminal-game
+  screenshot (untouched by Wave 9; investigate at/before the gate);
+  process note — implementer mutation lists must be enumerated
+  somewhere auditable, not summarised as a count (verifier substituted
+  its own). Verifier also deliberately SKIPPED cargo runs to avoid
+  contending with the live generation run — correct call, engine diff
+  provably empty. All three post-gate defects implemented: tactical
   fallback at cap expiry (horizon map perfect 10 / strong 8 / fair 7 /
   weak 3, fair/weak reusing their own score horizons under the
   max_ply+1 convention), level-label qualifier as real rendered text

@@ -177,9 +177,28 @@
   criterion 1's primary evidence is the full release-fixture run executing
   on CI (bare checkout, deployed commit); criterion 3's on-device half
   HELD for owner phone evidence per instruction.
-- Awaiting owner: 6c on-device evidence (phone, incl. mobile Safari)
-  against the live URL — the held half of criterion 3 and the final gate
-  input.
+- **On-device evidence IN (owner, 2026-07-28, iPhone — Safari then
+  Chrome, both clean): all six checks pass on the live URL.** Cold open →
+  live board with engine move; ply-12+ analysis settles under a second
+  (gate #3's on-device half SATISFIED); one-handed portrait usable,
+  columns 1 and 7 reachable; mid-game relaunch restores board+seat in
+  agreement, no re-ask; four seats flip wording correctly (gate #2 live);
+  airplane-mode reload works offline.
+
+## Post-gate findings (logged 2026-07-28 — NOT gate blockers, Phase 2 work)
+
+1. **Engine plays into trivial double threats early-game at "Perfect"**
+   (owner repro at move 8: ignored an open-ended three-across; screenshots
+   on record). Root cause: SPEC §3.1's solved-subset-at-cap rule — a
+   partial deep search misses tactics a complete shallow one cannot.
+   SPEC amended: on cap expiry, play from a complete fixed-depth tactical
+   search (no heuristic; horizon-as-draw). KNOWN DEFECT until Phase 2
+   implements it (the opening book removes most of the exposure).
+2. **Level label lies under partial play** — "Perfect" shown while moves
+   are partial. SPEC §3.1 amended: the label must be qualified at its own
+   surface when the level's defining computation didn't run.
+3. **Finished games show "Still solving this column" ×7** under a win
+   headline. SPEC §3.2 amended: terminal display beats analysis display.
 
 ## Ownership
 

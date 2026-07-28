@@ -138,6 +138,29 @@ reach `complete: true` quickly. The engine player must never stall the game:
 - At the cap with `complete: false` — play the level rule restricted to the
   SOLVED columns. If no column is solved, play the centre-most legal column.
   Deterministic given the same solved set (Strong's randomness excepted).
+
+**Amended 2026-07-28 (post-gate, owner evidence):** the solved-subset rule
+above is the wrong shape and is superseded. Playing from a partial DEEP
+search loses to trivial tactics — observed live at "Perfect": the engine
+ignored an open-ended three-across at move 8 because the refuting columns
+were unsolved. A COMPLETE search at reduced depth beats a partial search at
+full depth: it can't prove distant outcomes, but it never misses a forced
+win or loss within its horizon — which is exactly what "don't lose to a
+double threat" requires. New rule: on cap expiry with `complete: false`,
+the engine plays from a complete fixed-depth tactical search (win/loss
+within N ply, horizon-as-draw; no heuristic evaluation), falling back to
+centre-most only if even that cannot run. Implementation is Phase 2 work
+(the opening book removes most early-game incompleteness; this rule covers
+what remains) — until it lands, the old behaviour stands as a KNOWN DEFECT,
+logged in STATUS, not silently.
+
+**Level-label honesty (amended 2026-07-28).** A level label is data, and §6
+forbids placeholder data. When a move is made from anything less than the
+level's defining computation (partial analysis, tactical fallback), the UI
+must say so at the level's own surface — the label may not read "Perfect"
+unqualified while the move played was not. The move list's `partial` badge
+is necessary but not sufficient; the qualification must be visible where
+the level is claimed.
 - Honesty (§6): moves made from a partial analysis are marked as such in the
   move list, and the blunder flag never fires from a partial comparison — if
   either side of the before/after comparison is incomplete, it says "not
@@ -159,6 +182,12 @@ For each of the 7 columns display:
 
 Raw score shown as a secondary, toggleable detail. It confuses people and it is the
 main thing that makes gamesolver.org feel like a research tool rather than a trainer.
+
+**Finished games (amended 2026-07-28).** When the position is terminal, the
+per-column analysis reports the game's outcome ("game over — you won" /
+"—drawn"), never "still solving": there is nothing left to solve, and
+observed live the rail showed "Still solving this column" seven times under
+a "You win." headline. Terminal display beats analysis display.
 
 **Blunder flag:** after each human move, compare the evaluation before and after. If
 the verdict degrades (win → draw, draw → loss, win → loss), surface it immediately

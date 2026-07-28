@@ -40,7 +40,9 @@
 }
 
 .headline[data-variant='blunder'] .headline__sentence {
-  padding-right: var(--sp-6); /* clears the dismiss button, top-right */
+  /* Clears the dismiss button, top-right: its own right offset (--sp-2) plus
+   * its 44px touch target plus a small gap -- recompute if either changes. */
+  padding-right: calc(var(--sp-2) + 44px + var(--sp-1));
 }
 
 .headline__dismiss {
@@ -55,8 +57,11 @@
   line-height: 1;
   cursor: pointer;
   padding: var(--sp-1);
-  min-width: 32px;
-  min-height: 32px;
+  min-width: 44px; /* SPEC §6 touch-target floor -- was 32px */
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .headline__dismiss:focus-visible {

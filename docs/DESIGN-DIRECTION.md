@@ -151,8 +151,11 @@ never imply otherwise, including by accident of layout.
 
 **Forbidden**
 
-- Any fixed left-to-right or top-to-bottom ordering of red-then-yellow. Ordering implies
-  sequence.
+- Any fixed left-to-right or top-to-bottom ordering of red-then-yellow **in a
+  sequence-bearing context** — anywhere the two sides are listed as sides, in move records,
+  in results and rankings, in exports, or in any sentence naming both. In those places
+  ordering is read as who-goes-first or who-matters-more, and it implies sequence.
+  Option-enumeration controls are exempt; see the amendment at the end of this section.
 - A single combined control that sets both the user's colour and who moves first.
 - Red as a default, a first item, a primary colour, or the colour of any UI chrome.
 - A turn indicator drawn *inside* a colour swatch.
@@ -173,6 +176,44 @@ never imply otherwise, including by accident of layout.
   suggests a reset. The position is unchanged and must look unchanged.
 
 If a component can only be built by assuming red moves first, the component is wrong.
+
+**Amendment — option-enumeration controls are exempt (owner ruling, final).**
+
+As first written, this section contradicted itself. The Forbidden list banned *any* fixed
+red-then-yellow ordering, and two bullets later the Required list drew the seat controls as
+`You are [ ● Red | ○ Yellow ]` — red first. Both cannot stand. The app's colour pickers
+followed the Required depiction and were duly flagged against the Forbidden bullet by audit.
+The contradiction was mine, in the original draft; it is resolved here rather than quietly
+patched, so that anyone reading the Forbidden bullet's new scoping knows why it is scoped.
+
+**The ruling: pickers are exempt.** A *segmented picker that enumerates the two colours as
+the available choices* — the two seat controls, the Setup `PLACING` control, and anything
+later built to the same pattern — may present them in a fixed `Red | Yellow` order, and that
+order does not violate the bullet above. Three reasons, all of which hold only for
+option-enumeration:
+
+- **A picker's order carries no sequence meaning.** Its two segments are the answer set to a
+  question, not two sides being listed in an order. Nothing about `[ ● Red | ○ Yellow ]`
+  asserts that red goes first — the control immediately beside it is the one that says who
+  goes first, and it is independently set. The reading "left segment = first player" is not
+  available because the segments are alternatives, not a sequence.
+- **Some order is physically unavoidable.** A two-option control has to draw one segment
+  before the other. Unlike a list of the two sides — which can be ordered by role, You then
+  Opponent, per the Required list — an enumeration of colours has no non-colour key to sort
+  by. The bullet as originally written was therefore unsatisfiable here.
+- **Per-seat reordering would break a rule that matters more.** Flipping the segments to put
+  the user's colour first would re-lay-out the controls on every seat change, which the last
+  Required bullet forbids outright: on seat change, nothing re-lays out. A stable order is
+  what makes a seat change look like the position-preserving swap it is.
+
+What is *not* exempt, and still forbidden: ordering the two sides red-then-yellow in the
+verdict rail, the move list, exports, the parity caption, results, or any sentence naming
+both. Those are sequence-bearing and the original bullet governs them unchanged. The
+exemption is for controls that offer the colours as choices, and for nothing else.
+
+The rest of §5 stands as written. In particular red is still never a default — the picker's
+left segment is a position, not a preselection, and the first-run prompt (§8) ships with
+neither colour selected on either control.
 
 ---
 

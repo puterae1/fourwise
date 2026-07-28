@@ -40,7 +40,7 @@
 }
 
 .player-row__level-select {
-  min-height: 36px;
+  min-height: 44px; /* SPEC §6 touch-target floor -- was 36px */
   border-radius: var(--r-sm);
   border: 1px solid var(--c-n-3);
   background: var(--c-n-0);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, playMove, type GameState } from './gameState.js';
-import { deserialiseGameState, reconcileGameSeat, serialiseGameState } from './gameStateStorage.js';
+import { deserialiseGameState, serialiseGameState } from './gameStateStorage.js';
 import type { Seat } from './seat.js';
 
 const SEAT: Seat = { firstMover: 'red', userColour: 'yellow' };
@@ -95,15 +95,14 @@ describe('deserialiseGameState -- corrupt/invalid input never crashes, always nu
   });
 });
 
-describe('reconcileGameSeat', () => {
-  it('overrides the restored game\'s seat with the seat supplied, leaving everything else untouched', () => {
-    const restored = playedGame();
-    const newSeat: Seat = { firstMover: 'yellow', userColour: 'yellow' };
-    const reconciled = reconcileGameSeat(restored, newSeat);
-    expect(reconciled.seat).toEqual(newSeat);
-    expect(reconciled.mode).toBe(restored.mode);
-    expect(reconciled.setupPrefix).toBe(restored.setupPrefix);
-    expect(reconciled.moves).toEqual(restored.moves);
-    expect(reconciled.currentPly).toBe(restored.currentPly);
-  });
-});
+// `reconcileGameSeat` (this used to be tested right here) is gone (owner
+// ruling, 2026-07-28, mid-Wave-6a -- see `gameStateStorage.ts`'s own comment
+// where the function used to live): a restored `GameState`'s `seat` field is
+// now used exactly as stored, never overridden by the separately-persisted
+// `fourwise:seat` preference. That property is an INTEGRATION behaviour of
+// `ui/useGameController.ts` (which decides whether to build a fresh game
+// from the preference or use a restored one verbatim) rather than of this
+// module's pure (de)serialisation, so its test lives there instead --
+// `useGameController.controls.test.tsx`'s "a restored game's seat wins over
+// a differing stored preference" -- plus an App-level pin in
+// `gamePersistence.test.tsx`.

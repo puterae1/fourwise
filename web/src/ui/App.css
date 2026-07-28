@@ -32,7 +32,7 @@
   border: 1px solid var(--c-n-3);
   background: var(--c-n-0);
   border-radius: var(--r-sm);
-  min-height: 36px;
+  min-height: 44px; /* SPEC §6 touch-target floor -- was 36px */
   padding: 0 var(--sp-2);
   font-family: var(--f-body);
   font-size: var(--t-micro-size);

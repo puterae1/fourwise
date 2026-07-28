@@ -40,6 +40,31 @@ import './App.css';
 
 const EDITABLE_KEYS = new Set(['1', '2', '3', '4', '5', '6', '7']);
 
+// Text-entry types a native `<input>` can have -- the only inputs the global
+// keydown listener below should defer to, because typing into one of these
+// could plausibly contain a digit or the letters 'u'/'r'. This app has no
+// free-text fields at all: every `<input>` on screen is a `type="radio"`
+// (the `Segmented` seat/per-side/placing controls) or the hidden `type=
+// "file"` import trigger, neither of which consumes digit keys natively.
+// Excluding the whole `INPUT` tag (the previous behaviour) silently broke
+// SPEC §4's "full keyboard control" the moment any Segmented radio held
+// focus -- which is very reachable, since the seat bar sits at the top of
+// every mode.
+const TEXT_ENTRY_INPUT_TYPES = new Set(['text', 'search', 'email', 'password', 'tel', 'url', 'number']);
+
+function isTextEntryTarget(target: HTMLElement | null): boolean {
+  if (!target) return false;
+  if (target.tagName === 'TEXTAREA') return true;
+  if (target.isContentEditable) return true;
+  if (target.tagName === 'INPUT') {
+    return TEXT_ENTRY_INPUT_TYPES.has((target as HTMLInputElement).type);
+  }
+  // A native <select> (the per-side engine-level dropdown, PlayPanel.tsx)
+  // stays excluded -- unlike a radio input, digit keys ARE meaningful there
+  // (some browsers jump to an option by first-letter/digit match).
+  return target.tagName === 'SELECT';
+}
+
 function selectedColumnSentence(index: number, translated: TranslatedAnalysis | null): string {
   const column = translated?.columns[index];
   if (!column || column.kind === 'unknown') return namedColumnUnknown(index);
@@ -57,31 +82,41 @@ function App() {
   // means the prompt is up and `chosenSeat` stays `null` until Start.
   const [chosenSeat, setChosenSeat] = useState<Seat | null>(() => loadStoredSeat());
   // SPEC §5, "current game survives a refresh". Read once at mount, same
-  // pattern as `chosenSeat` above -- `useGameController` reconciles this
-  // against whichever seat is actually in force (`reconcileGameSeat`), so
-  // the two independently-persisted keys (`fourwise:seat`, `fourwise:game`)
-  // can never disagree about whose seat the restored game is playing under.
+  // pattern as `chosenSeat` above. Seat persistence architecture (owner
+  // ruling, 2026-07-28, mid-Wave-6a): `useGameController` no longer
+  // reconciles a restored game's seat against `chosenSeat` -- a restored
+  // game's OWN embedded seat wins outright (see that hook's own doc
+  // comment). `chosenSeat`/`fourwise:seat` is a first-run DEFAULT only, used
+  // solely to seed a brand-new game when `restoredGame` is absent.
   const [restoredGame] = useState<GameState | null>(() => loadStoredGame());
   const controller = useGameController(client, chosenSeat, restoredGame);
 
-  // `useSetupEditor`, the mode-transition ref and the keyboard listener
-  // below all need *some* colour pair to stay hooks-unconditional while the
-  // prompt is up (`controller` is `null` then) -- the fallback is inert
-  // because everything that would act on it is gated behind `!controller`
-  // just below, so it never reaches the screen.
-  const setup = useSetupEditor(controller?.seat.firstMover ?? 'red', controller?.seat.userColour ?? 'red');
+  // The FIRST-RUN prompt's Start button is the ONLY place `fourwise:seat`
+  // is written (owner ruling, 2026-07-28, mid-Wave-6a). It used to also be
+  // written by a `useEffect` keyed on `controller.seat` (removed below),
+  // which fired on every in-app seat change AND on every import -- silently
+  // overwriting the user's remembered preference with whatever colour a
+  // one-off imported file happened to declare. In-app seat changes and
+  // imports still take effect immediately (they change `controller.game.
+  // seat`, which the `saveGame` effect below already persists), they just no
+  // longer touch the separate preference.
+  function handleSeatChosen(seat: Seat) {
+    saveSeat(seat);
+    setChosenSeat(seat);
+  }
+
+  // `useSetupEditor` needs to stay hooks-unconditional while the prompt is
+  // up (`controller` is `null` then) -- it takes `null` directly rather
+  // than a per-colour fallback, and re-syncs its own `placing` colour the
+  // moment a real seat arrives (see that hook's own doc comment for why:
+  // this is occurrence three of the "silently falls back to red" bug
+  // class, verifier audit Wave 6a).
+  const setup = useSetupEditor(controller?.seat ?? null);
   const prevModeRef = useRef(controller?.mode ?? 'play');
   const [moveListOpen, setMoveListOpen] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const showRail = isDesktopLayout(viewportWidth);
-
-  // Persist the seat (SPEC §5, "seat preference remembered") on every
-  // change -- the prompt's own Start handler covers the very first write,
-  // this covers every later in-app seat change via `SeatControls`.
-  useEffect(() => {
-    if (controller) saveSeat(controller.seat);
-  }, [controller?.seat]);
 
   // Persist the current game (SPEC §5, "current game survives a refresh")
   // on every change -- moves, undo/redo, jump-to-ply, mode switches, and a
@@ -117,7 +152,7 @@ function App() {
       if (!controller) return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
-      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      if (isTextEntryTarget(target)) return;
 
       if (controller.mode === 'setup') {
         if (EDITABLE_KEYS.has(event.key)) {
@@ -149,7 +184,7 @@ function App() {
         <header className="page__utility">
           <span className="page__title">fourwise</span>
         </header>
-        <SeatPrompt client={client} onStart={setChosenSeat} />
+        <SeatPrompt client={client} onStart={handleSeatChosen} />
       </div>
     );
   }

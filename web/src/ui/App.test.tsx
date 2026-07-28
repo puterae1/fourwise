@@ -223,4 +223,35 @@ describe('keyboard control', () => {
       'true',
     );
   });
+
+  // Quality-floor audit (Wave 6a): SPEC §4's "full keyboard control" must
+  // hold "including while the rail/panels are present" -- concretely, while
+  // one of the app's own focusable controls has focus, not just when focus
+  // sits on `<body>` (which is all `fireEvent.keyDown(window, ...)` above
+  // exercises, since a bare `window` target's `tagName` is `undefined` and
+  // was never excluded by the old guard either). The previous guard
+  // excluded every `<input>` tag outright, which included the seat bar's
+  // and per-side controls' `type="radio"` inputs -- meaning digits 1-7 (and
+  // u/r) silently stopped working the moment a user tabbed to "You are" or
+  // a per-side Human/Engine control, both of which sit on screen in every
+  // mode. This is the regression test for that fix.
+  it('digit keys still drop a disc while a seat-control radio button has focus', () => {
+    render(<App />);
+
+    const redRadio = within(youAreGroup()).getByRole('radio', { name: 'Red' }) as HTMLInputElement;
+    redRadio.focus();
+    expect(document.activeElement).toBe(redRadio);
+
+    const columnButton = () => screen.getByRole('button', { name: /Drop in column 4|Column 4, full/ });
+    expect(columnButton().querySelector('.board__disc')).not.toBeInTheDocument();
+
+    fireEvent.keyDown(redRadio, { key: '4' });
+    expect(columnButton().querySelector('.board__disc')).toBeInTheDocument();
+
+    // `moves.length` never shrinks on undo (only `currentPly` does -- see
+    // `game/gameState.ts`'s `undo`), so the observable effect of 'u' here is
+    // the disc coming back OFF the board, not the "Moves (n)" count changing.
+    fireEvent.keyDown(redRadio, { key: 'u' });
+    expect(columnButton().querySelector('.board__disc')).not.toBeInTheDocument();
+  });
 });

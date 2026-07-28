@@ -18,7 +18,7 @@
   font-weight: var(--w-body-strong);
   color: var(--c-n-7);
   cursor: pointer;
-  min-height: 32px;
+  min-height: 44px; /* SPEC §6 touch-target floor -- was 32px */
 }
 
 .segmented__option[data-checked='true'] {

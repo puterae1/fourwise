@@ -72,15 +72,25 @@ export function deserialiseGameState(value: unknown): GameState | null {
   return { seat, mode: v.mode as Mode, setupPrefix, moves, currentPly: v.currentPly };
 }
 
-/**
- * Seat persistence already exists independently (`fourwise:seat`,
- * `ui/seatStorage.ts`) -- this module does not duplicate it. A game
- * restored from storage carries its OWN `seat` field (needed so
- * `deserialiseGameState` can validate/replay it), but the seat actually in
- * force at runtime must come from the single `fourwise:seat` preference, not
- * from whatever happened to be embedded in the game blob. This is the one
- * place those two independently-stored things are reconciled.
- */
-export function reconcileGameSeat(state: GameState, seat: Seat): GameState {
-  return { ...state, seat };
-}
+// Seat/game persistence architecture (owner ruling, 2026-07-28, mid-Wave-6a
+// -- supersedes this file's earlier "reconcile" step, removed below):
+//
+// `fourwise:seat` (`ui/seatStorage.ts`) is a FIRST-RUN DEFAULT ONLY. It is
+// written once, by the first-run prompt's Start button, and seeds a
+// brand-new game (`createGame(seat, ...)`, called from `ui/useGameController.
+// ts` when no game is stored yet). It is never rewritten by an in-app seat
+// change or by importing a file.
+//
+// The ACTIVE seat -- whatever a live or restored game is actually being
+// played under -- persists WITH the game record itself, in this module's own
+// `seat` field, via `fourwise:game` (`ui/gameStorage.ts`). A restored game's
+// `seat` (validated above by `deserialiseGameState`) is used EXACTLY as
+// stored, never overridden by the separately-stored preference: this file
+// used to export a `reconcileGameSeat(state, seat)` that replaced a restored
+// game's seat with whatever `fourwise:seat` currently held, which meant a
+// reload mid-imported-game (or after any in-app seat change, before this
+// ruling) could restore the BOARD from one seat and the SEAT CONTROLS from
+// another, disagreeing pair -- the imported/changed game would silently
+// replay under the wrong seat. There is deliberately no reconciliation
+// function here any more: a restored `GameState`'s own `seat` field already
+// IS the answer.

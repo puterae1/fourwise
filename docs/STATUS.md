@@ -122,17 +122,42 @@
   judged assertions mutation-sensitive), desktop rail driven by the
   litColumn signal with zero mode inspection, lamp-reveal DOM test closing
   the 4b coverage hole, seatStorage corrupt tests, comment cleanup.
-  **OWNER RULING PENDING:** importing a file permanently overwrites the
-  persisted `fourwise:seat` preference (via the pre-existing saveSeat
-  effect), not just the active session — verifier proved it empirically;
-  no test pins it either way. Committed as-is; adjust on ruling.
+  **OWNER RULED 2026-07-28:** import updates the ACTIVE seat only, never
+  the stored preference (test pinning it required); the active seat
+  persists WITH the game state, `fourwise:seat` is the first-run default
+  only (reconcileGameSeat inverted — a restored game keeps its own
+  embedded seat, killing the mid-imported-game reload disagreement).
+  Being implemented in 6a.
   Also carried to 6a: default side controls are per-colour (yellow=engine)
   — a first-run user choosing yellow watches the engine play their colour;
   fix to by-role defaults (user=human).
 
+- **Wave 6a — COMPLETE, verifier PASS 2026-07-28** (one FAIL round).
+  Quality floor: 5 PASS / 2 FIXED (keyboard guard was swallowing 1-7/u/r
+  whenever a radio had focus — real bug, fixed with regression test; four
+  controls bumped to 44 px). Role-based controls default (creation-time
+  only; per-colour stability mid-game tested). Seat-persistence ruling
+  implemented in full and verifier-confirmed point by point. Perf: worst
+  case 39.1 ms across plies 15–25 (fixtures have no ply-12–14 lines) —
+  BUT the committed throttle-probe artifact proves CDP throttling does not
+  slow dedicated Workers (main thread 3.93×/5.92×, Worker flat 1.00×), so
+  desk numbers are effectively unthrottled; gate #3 evidence remains the
+  phone in 6c, per the ROADMAP pin.
+  **Colour-role hunt: CLOSED.** The verifier's sweep of all of web/src
+  examined every candidate. Occurrence three (Setup placing colour
+  defaulting red for first-run yellow users — a useState reading its arg
+  once pre-controller) was found, fixed with the re-sync/latch pattern,
+  and re-verified. The only other flag — fixed Red|Yellow picker ordering —
+  was a §5 internal contradiction (its Forbidden bullet vs its own
+  Required example), owner-ruled 2026-07-28: pickers exempt, Forbidden
+  bullet scoped to sequence-bearing contexts; design-lead amended §5 on
+  the record (headless Opus, verified). Every remaining candidate in the
+  sweep table is inert or correct. **There is no known occurrence four.**
+
 ## In flight
 
-Next: **Wave 6a** — quality floor + perf smoke against the pinned gate #3.
+Next: **Wave 6b — deploy** (Actions workflow; repo-public review awaits
+owner sign-off on the inventory).
 
 ## Ownership
 

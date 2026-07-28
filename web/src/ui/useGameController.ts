@@ -26,7 +26,6 @@ import {
   type GameState,
   type Mode,
 } from '../game/gameState.js';
-import { reconcileGameSeat } from '../game/gameStateStorage.js';
 import { parseImportFile, toGameState } from '../game/exportFormat.js';
 import { colourAtPly, otherColour, type Colour, type Seat } from '../game/seat.js';
 import type { Grid } from '../game/setup.js';
@@ -37,7 +36,7 @@ import type { AnalysisResult } from '../engine/types.js';
 import type { Calibration, EngineClient } from '../engine/client.js';
 import { deriveBoard, type BoardDerivation } from './deriveBoard.js';
 import { checkForBlunder, type BlunderInput } from './blunderCheck.js';
-import type { Controls, Levels, SideControl } from './types.js';
+import { defaultControls, type Controls, type Levels, type SideControl } from './types.js';
 
 const ANALYSE_THINK_MS = 3000;
 const AUTO_REVEAL_THINK_MS = 2000;
@@ -119,13 +118,15 @@ export interface GameController {
   commitSetup: (grid: Grid, targetMode: 'play' | 'analyse') => { ok: true } | { ok: false; message: string };
 
   /** JSON import (SPEC §5 amendment) -- parses raw file text end-to-end via
-   * `game/exportFormat.ts` and, on success, REPLACES the current game (and
-   * its seat -- an imported game brings its own, unlike a local-storage
-   * restore, which reconciles against the separately-persisted seat
-   * preference instead; see `reconcileGameSeat`'s own doc comment for why
-   * those two cases differ). Never throws; a failure returns the exact
-   * honest message `exportFormat.ts` produced, one of the three distinct
-   * failure modes (SPEC §5 amendment). */
+   * `game/exportFormat.ts` and, on success, REPLACES the current game
+   * (`setGame`), its seat included, exactly as brought by the file. This
+   * updates the ACTIVE seat only (owner ruling, 2026-07-28, mid-Wave-6a):
+   * unlike a restored game (which keeps its own seat too, for the same
+   * reason -- see this function's own doc comment above), an import must
+   * NOT touch the separately-persisted `fourwise:seat` preference, which
+   * `App.tsx` only ever writes from the first-run prompt now. Never throws;
+   * a failure returns the exact honest message `exportFormat.ts` produced,
+   * one of the three distinct failure modes (SPEC §5 amendment). */
   importGame: (fileText: string) => { ok: true } | { ok: false; message: string };
 }
 
@@ -144,12 +145,19 @@ const PLACEHOLDER_SEAT: Seat = { firstMover: 'red', userColour: 'red' };
 
 /**
  * `initialGame`, if supplied, is a game restored from `localStorage`
- * (`ui/gameStorage.ts`, SPEC §5 "current game survives a refresh") --
- * ALREADY reconciled against the seat in force is NOT assumed here; this
- * hook does that reconciliation itself (`reconcileGameSeat`) the moment
- * both `initialGame` and `initialSeat` are available, so the two
- * independently-persisted things (`fourwise:seat` and `fourwise:game`) can
- * never disagree about whose seat the restored game is playing under.
+ * (`ui/gameStorage.ts`, SPEC §5 "current game survives a refresh"). Seat
+ * persistence architecture (owner ruling, 2026-07-28, mid-Wave-6a --
+ * supersedes an earlier "reconcile against `initialSeat`" step, removed):
+ * `initialGame`'s OWN `seat` field is used exactly as stored, never
+ * overridden by `initialSeat` (the separately-persisted `fourwise:seat`
+ * preference) -- that preference is a first-run DEFAULT only, consulted
+ * solely to seed a BRAND-NEW game when no game is stored yet. A restored
+ * game's own seat is what "current game survives a refresh" has to mean:
+ * an in-app seat change or an import already changes `game.seat` (and
+ * `App.tsx` persists the whole game, seat included), so if a reload then
+ * re-applied the OLDER, unrelated `fourwise:seat` preference on top, the
+ * board and the seat controls would disagree about whose seat the restored
+ * game is actually playing under.
  */
 export function useGameController(
   client: EngineClient | null,
@@ -163,10 +171,32 @@ export function useGameController(
   // only source of truth is what makes "changing seat re-renders colours
   // from the same game state, no reset" true by construction rather than
   // by careful bookkeeping.
-  const [game, setGame] = useState<GameState | null>(() => {
-    if (!initialSeat) return null;
-    return initialGame ? reconcileGameSeat(initialGame, initialSeat) : createGame(initialSeat, 'play');
-  });
+  //
+  // Precedence: a restored `initialGame` wins outright (its own `seat`,
+  // untouched -- see this function's doc comment above); only when there is
+  // NO restored game does `initialSeat` get used, to seed a brand-new one.
+  // `initialSeat` being present is still the overall gate for "is there a
+  // seat to play under at all" (unchanged from before this ruling): with
+  // neither a restored game nor a preference, there is nothing to build a
+  // game from yet, and this hook returns `null` (the caller shows the
+  // first-run prompt).
+  function buildGame(seat: Seat | null, restored: GameState | null | undefined): GameState | null {
+    if (restored) return restored;
+    if (!seat) return null;
+    return createGame(seat, 'play');
+  }
+
+  const [game, setGame] = useState<GameState | null>(() => buildGame(initialSeat, initialGame));
+
+  // Role-based default (Wave 6a, carried-defect fix): the user's own colour
+  // starts human-controlled, the opponent's starts engine-controlled --
+  // `defaultControls` reads whatever `game` ACTUALLY ended up being (a
+  // restored game's own seat if one exists, otherwise the freshly-created
+  // one), never a standing derivation recomputed on every render, which is
+  // what keeps a later in-app seat change from silently reassigning who
+  // controls which colour (CLAUDE.md invariant #1; the `setUserColour`/
+  // `setFirstMover` setters below never touch `controls`).
+  const [controls, setControls] = useState<Controls>(() => defaultControls(game?.seat.userColour ?? 'red'));
 
   // Starts the game the first time `initialSeat` goes from absent to
   // present (the prompt's Start button, or a stored seat arriving after
@@ -183,7 +213,15 @@ export function useGameController(
   if (initialSeat !== seenInitialSeat) {
     setSeenInitialSeat(initialSeat);
     if (!game && initialSeat) {
-      setGame(initialGame ? reconcileGameSeat(initialGame, initialSeat) : createGame(initialSeat, 'play'));
+      const built = buildGame(initialSeat, initialGame);
+      setGame(built);
+      // The `controls` `useState` initializer above only ever saw `game` as
+      // it was AT MOUNT (typically still absent, before the first-run
+      // prompt's Start button fires) -- this is the other moment a real
+      // game can arrive, so the role-based default is (re)applied here too,
+      // off the same `built` value `setGame` just received. Still a
+      // one-time default, never a standing derivation from `seat`.
+      setControls(defaultControls(built?.seat.userColour ?? 'red'));
     }
   }
 
@@ -193,7 +231,6 @@ export function useGameController(
   const placeholderGame = useMemo(() => createGame(PLACEHOLDER_SEAT, 'play'), []);
   const effectiveGame = game ?? placeholderGame;
   const seat = effectiveGame.seat;
-  const [controls, setControls] = useState<Controls>({ red: 'human', yellow: 'engine' });
   const [levels, setLevels] = useState<Levels>({ red: 'strong', yellow: 'strong' });
   const [markersOn, setMarkersOn] = useState(true);
   const [rawScoresOn, setRawScoresOn] = useState(false);
@@ -491,11 +528,16 @@ export function useGameController(
   );
 
   // SPEC §5 amendment: import replaces the whole game, seat included -- an
-  // imported file brings its OWN seat (unlike restoring from `localStorage`,
-  // which reconciles against the seat already in force; see `initialGame`'s
-  // doc comment above). `App.tsx`'s existing `saveSeat`/`saveGame` effects
-  // (keyed on `controller.seat`/`controller.game`) already persist whatever
-  // this sets, with no separate wiring needed here.
+  // imported file brings its OWN seat, used exactly as-is, the same way a
+  // restored `localStorage` game keeps its own seat rather than being
+  // reconciled against anything else (see `initialGame`'s doc comment
+  // above; owner ruling, 2026-07-28, mid-Wave-6a). `App.tsx`'s existing
+  // `saveGame` effect (keyed on `controller.game`) already persists
+  // whatever this sets, with no separate wiring needed here -- and,
+  // correctly, does NOT also write `fourwise:seat`: that preference is
+  // written only once, from the first-run prompt's `Start` (`App.tsx`'s
+  // `handleSeatChosen`), so an import changes the ACTIVE seat without ever
+  // touching the separately-persisted preference.
   const importGame = useCallback((fileText: string) => {
     const outcome = parseImportFile(fileText);
     if (!outcome.ok) return { ok: false as const, message: outcome.message };

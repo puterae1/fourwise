@@ -7,4 +7,8 @@ export default defineConfig({
   worker: {
     format: 'es',
   },
+  server: {
+    port: 5183,
+    strictPort: true,
+  },
 });

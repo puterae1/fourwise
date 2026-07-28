@@ -671,6 +671,109 @@ rests on inference any more.**
 3. **Finished games show "Still solving this column" ×7** under a win
    headline. SPEC §3.2 amended: terminal display beats analysis display.
 
+## Post-Phase-2 findings (logged 2026-07-29 — owner-requested gamesolver
+cross-check + four-seat perfect self-play; **FIXED: owner ruled fix-now,
+Wave 11 delivered, verifier PASS 2026-07-29 — see Wave 11 record below**)
+
+4. **CONFIRMED ENGINE DEFECT: per-column analysis scores are garbage for
+   any column that wins immediately.** Found by the new
+   `tools/compare_gamesolver.rs` harness (20 seeded positions, plies
+   4–20, all cross-checked against connect4.gamesolver.org's solve API):
+   16/20 rows match exactly; the 4 mismatching rows differ ONLY in their
+   immediate-win columns (e.g. pos `1264234` col 5: gamesolver +18, ours
+   −16; pos `1451336251725537574` col 4: gamesolver +12, ours −3 — a
+   sign-flipped "losing" label on the winning move). Root cause, code-
+   read confirmed: `analysis.rs::analyse_with_book` scores every column
+   as `-solve_budgeted(child)` with no just-won guard; the solver's
+   immediate-win short-circuit only checks the CHILD's mover, never an
+   already-completed alignment (the Pons precondition "never solve a
+   won position" is violated at exactly this call site — internal
+   negamax never does this, only the top-level per-column loop). Book
+   never masks it: won children are never book entries. Position-level
+   `solve()` is unaffected (all 20 position scores agree with gamesolver
+   via max-over-columns; the 6,000 Pons fixtures never contain won
+   positions, which is why nothing ever caught it — Wave 3's POV test
+   validated against the same wrong negated-child rule). Blast radius:
+   analysis-panel column scores (invented data, the thing this project
+   forbids), verdict copy (`verdict.ts:110`), and engine move choice at
+   ALL levels (`levels.ts` ranks on these scores — Perfect/Strong can
+   prefer a slower win over an immediate one; a constructed position
+   whose ONLY winning move is immediate could be thrown away entirely;
+   Fair/Weak's horizon clamp also computes distance from the garbage
+   score). FIXED by Wave 11 (record below): guard at BOTH call sites —
+   tactical.rs had the identical live bug, found by the owner-ordered
+   vacuous-test sweep and empirically reproduced ("273747": winning
+   columns −18, truth +18) before the fix reached it.
+
+**Wave 11 — immediate-win guard, COMPLETE, verifier PASS 2026-07-29
+(7/7).** Owner ruled fix-now before Phase 3, six-item scope + sweep.
+Delivered (`rust-engine`, one send-back en route: the only-winning-
+move regression case was first built on a fixture with three winning
+columns — re-pointed at "353676321354762", whose immediate win is the
+UNIQUE winning move and which the pre-fix code scored −13 vs the
+col-4 draw at 0, i.e. the engine would have thrown away the win):
+- `Position::is_winning_move(col)` (position.rs) as the shared
+  primitive; guards in `analysis.rs::analyse_with_book` AND
+  `tactical.rs::tactical_analyse_with_book` — a four-completing column
+  scores `22 − (floor(moves/2)+1)` directly, BEFORE book lookup, won
+  children never searched or book-consulted. Formula-agreement tests
+  pin both copies to the solver's own private expression.
+- ENGINE.md "Score point of view" pin amended: negated-child rule is
+  NON-TERMINAL CHILDREN ONLY; both old POV tests recorded as vacuous
+  for this class (oracle = the same rule the implementation encoded).
+  Both rewritten against independent ground truth; the two analysis.rs
+  budget-test oracles with the same vacuous derivation also fixed.
+- Regression fixtures: the four gamesolver-verified full column
+  arrays ("1264234", "353676321354762", "612375344567673432",
+  "1451336251725537574"), only-winning-move-is-immediate, and
+  immediate-beats-slower-win (best must pick the faster).
+- `tools/compare_gamesolver.rs` harness committed as a permanent
+  asset (20 seeded positions, plies 4–20, gamesolver-format output —
+  the tool that found the defect). `web/src/game/selfplay.perfect.
+  test.ts` committed: four-seat Perfect-vs-Perfect self-play, real
+  wasm + real book, partial results = failure.
+Verifier evidence (independent, its own runs): 20/20 gamesolver
+cross-check re-curled and diffed itself; four mutation classes
+(guard bypass ×2 sites, formula off-by-one ×2 sites) each caught by
+named tests (3–6 per mutation; one parity coincidence in a single
+test/fixture pairing noted, covered by three other tests); formula
+re-derived algebraically both parities; guard-before-book proven by
+a planted-wrong-book-entry test; debug suites 147/0 + clippy clean;
+FULL release `--include-ignored` run on the current tree: 0 failures
+anywhere — reference 8/8 (all six Pons sets exact, 4515 s), book
+replay battery 3/3 incl. production replay (731 s), lib 93/93 incl.
+empty-board solve, ~1h32m total under shared-Mac load; web 310/310
+on a freshly rebuilt pkg (verifier caught the pkg stale after the
+wave's edits and rebuilt it — sanctioned build artifact) incl.
+four-seat self-play (centre open, first mover wins, 41 plies, four
+games move-identical). Tree restored byte-identical after every
+mutation; process table clean.
+**Sweep verdict (owner-ordered, `verifier`, read-only, parallel):
+tactical.rs's POV test was the FIFTH vacuous-oracle instance (and
+guarded a live bug); two further vacuous negated-child oracles in
+analysis.rs budget tests (fixed this wave); NO SIXTH instance across
+engine/src, engine/tests, and all web suites — near-misses examined
+and cleared individually (book mirror-key re-derivation, reference
+negamax self-consistency's independent 2D oracle, levels real-engine
+integration test). Caveats on record: book_replay.rs not re-derived
+(previously verifier-audited); mock-only UI component tests are
+structurally outside the class.**
+Operational note: `cargo test --release -- --ignored
+--include-ignored` is rejected (mutually exclusive flags);
+`--include-ignored` alone is the correct full-run invocation.
+Post-verifier: committed; engine-release-fixtures CI re-dispatched
+per the engine-change precedent (result to be appended here).
+
+**Four-seat perfect self-play: PASS (same session).** New
+`web/src/game/selfplay.perfect.test.ts` (real wasm + real book.bin,
+book load mandatory, partial results = failure, 4B node budget): all
+four seat configs — centre first move, FIRST MOVER WINS, exactly 41
+plies, and all four games byte-identical move-for-move (engine boundary
+provably colour/turn-order blind through the production game layer).
+310 web tests green including the new one. Note: this result does not
+contradict defect #4 — at score +1 the fastest win IS the 41st ply, so
+the self-play line gave the garbage path no earlier win to decline.
+
 ## Ownership
 
 | Agent | Model | Owns |

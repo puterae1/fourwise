@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     # Observed runtime is ~30 minutes; generous headroom for CI variance
     # without letting a hang run indefinitely.
-    timeout-minutes: 90
+    timeout-minutes: 240
     defaults:
       run:
         working-directory: engine

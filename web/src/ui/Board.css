@@ -116,8 +116,47 @@
 }
 
 .board__grid {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(7, var(--cell));
+}
+
+/* §9 "Game over" (win half) — an overlay exactly matching the CELLS area
+ * (columns have no horizontal padding, `--sp-1` vertical padding top/bottom
+ * -- see `.board__column` below), so its `viewBox` cell-unit coordinates
+ * land exactly on disc centres at any `--cell` size. `pointer-events: none`
+ * so it never intercepts a column click; it only ever renders once the game
+ * is won (`Board.tsx` gates the whole element on `winLineEndpoints`). */
+.board__win-line {
+  position: absolute;
+  inset: var(--sp-1) 0;
+  pointer-events: none;
+  z-index: 2;
+  animation: board-win-line-in var(--dur-ui) var(--ease-ui);
+}
+
+.board__win-line-outer,
+.board__win-line-inner {
+  stroke-linecap: round;
+}
+
+.board__win-line-outer {
+  stroke: var(--c-n-0);
+  stroke-width: 9px;
+}
+
+.board__win-line-inner {
+  stroke: var(--c-frame);
+  stroke-width: 5px;
+}
+
+@keyframes board-win-line-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .board__column {

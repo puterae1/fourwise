@@ -289,14 +289,21 @@ function App() {
   const boardCanDrop = isSetup ? (col: number) => !isColumnFull(setup.grid, col) : controller.canDrop;
 
   // ---- parity ruler ---------------------------------------------------
-  // SPEC §2 (amended): the ruler names the USER's rows, computed from
-  // `userMovesFirst` alone, and never appears without its "waiting threats
-  // only" label -- `canShowParityRuler` is the one place that "hide
-  // entirely, never unlabelled" decision is made (Setup gets its own `null`
-  // here for a separate, unrelated reason: freely placing discs isn't a turn
-  // sequence to have parity about).
+  // SPEC §2 (amended) + SPEC §3.2's scope clarification (2026-07-29): the
+  // ruler names the USER's rows, computed from `userMovesFirst` alone, and
+  // never appears without its "waiting threats only" label --
+  // `canShowParityRuler` is the one place that "hide entirely, never
+  // unlabelled" decision is made (Setup gets its own `null` here for a
+  // separate, unrelated reason: freely placing discs isn't a turn sequence
+  // to have parity about). It is itself an analysis-derived surface -- rows
+  // that will win a WAITING THREAT have nothing left to mean once the game
+  // has actually ended, so it hides outright on a terminal position (hides,
+  // not degrades -- the established convention, Wave 5a) rather than showing
+  // parity rows for a game that is already decided.
   const parityUserRows =
-    !isSetup && canShowParityRuler(viewportWidth) ? parityRows(userMovesFirst(controller.seat)).user : null;
+    !isSetup && !controller.board.isGameOver && canShowParityRuler(viewportWidth)
+      ? parityRows(userMovesFirst(controller.seat)).user
+      : null;
 
   return (
     <div className="page">

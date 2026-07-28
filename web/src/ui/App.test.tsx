@@ -194,6 +194,81 @@ describe('parity ruler (SPEC §2, amended)', () => {
     expect(screen.queryByText(/Waiting threats/)).not.toBeInTheDocument();
     expect(document.querySelector('.parity-ruler__row')).not.toBeInTheDocument();
   });
+
+  // SPEC §3.2's scope clarification (2026-07-29): the ruler is an
+  // analysis-derived surface ("waiting threats" is meaningless once the game
+  // has actually ended) and must hide, not degrade, on a terminal position --
+  // the established convention (Wave 5a), matching AnalysePanel/Rail's own
+  // `terminal` gate rather than inventing a second treatment.
+  it('is present mid-game (baseline for the two terminal cases below)', () => {
+    render(<App />);
+    fireEvent.keyDown(window, { key: '4' });
+    expect(screen.getByText(/Waiting threats/)).toBeInTheDocument();
+    expect(document.querySelector('.parity-ruler__row')).toBeInTheDocument();
+  });
+
+  it('hides on a WON game -- red completes a horizontal four', () => {
+    render(<App />);
+
+    // Build red 1-2-3 on the bottom row and yellow 5-6-7 on the bottom row
+    // via Setup (equal 3-3 counts, red to move next under firstMover=red --
+    // SPEC §3.3's reconstruction), then win in Play by dropping column 4.
+    fireEvent.click(screen.getByRole('tab', { name: 'SETUP' }));
+    dropColumn(1);
+    dropColumn(2);
+    dropColumn(3);
+    const placingGroup = screen.getByRole('radiogroup', { name: 'Colour to place' });
+    fireEvent.click(within(placingGroup).getByRole('radio', { name: 'Yellow' }));
+    dropColumn(5);
+    dropColumn(6);
+    dropColumn(7);
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    dropColumn(4); // red completes columns 1-4 on the bottom row
+
+    expect(screen.getByText('You win.')).toBeInTheDocument();
+    expect(screen.queryByText(/Waiting threats/)).not.toBeInTheDocument();
+    expect(document.querySelector('.parity-ruler__row')).not.toBeInTheDocument();
+  });
+
+  it('hides on a DRAWN game -- full board, no four for either side', () => {
+    render(<App />);
+
+    // A full board (21 red, 21 yellow -- equal counts, consistent with
+    // firstMover=red), built via Setup so Play-mode engine/human control
+    // gating never comes into it, verified offline to contain no
+    // four-in-a-row for either colour in any of the four directions. Each
+    // column's sequence below is bottom-to-top.
+    const DRAWN_BOARD: Record<number, Array<'red' | 'yellow'>> = {
+      1: ['yellow', 'yellow', 'yellow', 'red', 'yellow', 'yellow'],
+      2: ['yellow', 'red', 'yellow', 'red', 'red', 'red'],
+      3: ['red', 'red', 'yellow', 'yellow', 'yellow', 'red'],
+      4: ['red', 'yellow', 'red', 'yellow', 'red', 'yellow'],
+      5: ['red', 'red', 'yellow', 'red', 'red', 'red'],
+      6: ['yellow', 'red', 'yellow', 'red', 'yellow', 'red'],
+      7: ['yellow', 'red', 'yellow', 'yellow', 'red', 'yellow'],
+    };
+
+    fireEvent.click(screen.getByRole('tab', { name: 'SETUP' }));
+    const placingGroup = screen.getByRole('radiogroup', { name: 'Colour to place' });
+    let placing: 'red' | 'yellow' = 'red'; // Setup's own default (the seat's user colour)
+    function setPlacing(colour: 'red' | 'yellow') {
+      if (placing === colour) return;
+      fireEvent.click(within(placingGroup).getByRole('radio', { name: colour === 'red' ? 'Red' : 'Yellow' }));
+      placing = colour;
+    }
+    for (let column = 1; column <= 7; column++) {
+      for (const colour of DRAWN_BOARD[column]!) {
+        setPlacing(colour);
+        dropColumn(column);
+      }
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(screen.getByText('Drawn.')).toBeInTheDocument();
+    expect(screen.queryByText(/Waiting threats/)).not.toBeInTheDocument();
+    expect(document.querySelector('.parity-ruler__row')).not.toBeInTheDocument();
+  });
 });
 
 describe('keyboard control', () => {

@@ -39,6 +39,19 @@ export interface BoardProps {
 const COLUMN_INDICES = Array.from({ length: BOARD_COLUMNS }, (_, i) => i);
 const ROWS_TOP_DOWN = Array.from({ length: BOARD_ROWS }, (_, i) => BOARD_ROWS - 1 - i);
 
+// Cell-centre coordinates in the win-line overlay's own coordinate space --
+// its `viewBox` is `0 0 BOARD_COLUMNS BOARD_ROWS` (one user-unit per cell),
+// so these are plain "column/row index + 0.5", independent of `--cell`'s
+// actual pixel size at any viewport width (SPEC's "track the disc centres
+// exactly ... not just desktop"). Row 0 is the BOTTOM (SPEC §4), but the
+// board renders top-down (`ROWS_TOP_DOWN` above), so Y is flipped.
+function cellCentreX(column: number): number {
+  return column + 0.5;
+}
+function cellCentreY(row: number): number {
+  return BOARD_ROWS - 1 - row + 0.5;
+}
+
 export function Board({
   grid,
   winLine,
@@ -53,6 +66,21 @@ export function Board({
     const set = new Set<string>();
     for (const c of winLine?.cells ?? []) set.add(`${c.column},${c.row}`);
     return set;
+  }, [winLine]);
+
+  // §9 "Game over": the winning four is drawn as a line through the disc
+  // centres, not lit -- endpoints are the FIRST and LAST winning cell
+  // (`deriveBoard.ts`'s `findWinLine` always returns them in-order along the
+  // direction it found, so the two ends of `cells` are the two ends of the
+  // four; the two middle cells are colinear between them by construction of
+  // four-in-a-row, so a straight line between the ends passes through all
+  // four centres). `null` on a draw or mid-game -- there is no winning four.
+  const winLineEndpoints = useMemo(() => {
+    const cells = winLine?.cells;
+    if (!cells || cells.length < 4) return null;
+    const first = cells[0]!;
+    const last = cells[cells.length - 1]!;
+    return { x1: cellCentreX(first.column), y1: cellCentreY(first.row), x2: cellCentreX(last.column), y2: cellCentreY(last.row) };
   }, [winLine]);
 
   return (
@@ -130,6 +158,39 @@ export function Board({
                 </button>
               );
             })}
+            {winLineEndpoints && (
+              // §9 "Game over": "the winning four is drawn instead: a 5px
+              // `Frame` line through the disc centres with a 2px `--c-n-0`
+              // outer stroke." Two stacked, non-scaling-strokes give an
+              // exact-pixel-width line (5px inner, 9px outer) regardless of
+              // `--cell`'s clamped size, while the line's ENDPOINTS still
+              // live in the viewBox's cell-unit coordinate space, so they
+              // track the disc centres exactly at every viewport width.
+              <svg
+                className="board__win-line"
+                viewBox={`0 0 ${BOARD_COLUMNS} ${BOARD_ROWS}`}
+                preserveAspectRatio="none"
+                aria-hidden="true"
+                data-testid="win-line"
+              >
+                <line
+                  className="board__win-line-outer"
+                  x1={winLineEndpoints.x1}
+                  y1={winLineEndpoints.y1}
+                  x2={winLineEndpoints.x2}
+                  y2={winLineEndpoints.y2}
+                  vectorEffect="non-scaling-stroke"
+                />
+                <line
+                  className="board__win-line-inner"
+                  x1={winLineEndpoints.x1}
+                  y1={winLineEndpoints.y1}
+                  x2={winLineEndpoints.x2}
+                  y2={winLineEndpoints.y2}
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+            )}
           </div>
         </div>
       </div>

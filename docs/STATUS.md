@@ -102,6 +102,27 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
 
 ## In flight
 
+- **Wave 7.2 — THROUGHPUT COLLAPSE IN PRODUCTION, delegated 2026-07-28
+  (profile first, fix second).** Owner's live depth-8 run: 141% CPU
+  with 11 threads (~1.4 of 10 cores), 0.89 pos/s DECLINING on the
+  cheapest tier, ETA 40h+. Does not reconcile with 7.1's 2.66/s
+  "contended" probe — production is slower UNcontended. Hypotheses
+  under measurement: macOS background-QoS/E-core clamp on nohup-
+  detached processes (prime suspect — the probe ran session-attached;
+  also explains both numbers), 8 GB table memory pressure (probe used
+  2048), mutex/work-handout serialisation. Constraints: owner's run
+  NOT to be touched (it banks ~0.9/s into the checkpoint the fix
+  inherits); checkpoint format frozen; CPU-utilisation (cores busy)
+  is now a REQUIRED metric before/after — pos/s alone failed to
+  expose this. **Process lesson, owner-flagged: the 7.1 verifier
+  proved parallel output CORRECT but never FAST — perf-purposed waves
+  get a throughput/utilisation floor in their audit criteria from now
+  on.** Launch-script changes, if any, go through the orchestrator.
+
+- **Wave 8 — delegated 2026-07-28, running** (book.rs loader from doc
+  alone, tactical fallback, sample-replay mechanism per the owner's
+  200+5-10 fresh-solver ruling, two 7.1 nits).
+
 - **Wave 7.1 — verifier PASS 2026-07-28 (7/7, one non-blocking finding;
   fix in flight).** Verifier ran its OWN evidence, not the implementer's:
   independent serial vs threads-10 vs threads-25 comparison at

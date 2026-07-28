@@ -141,14 +141,18 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
   ~/fourwise-launch.sh now:** the finding is unreachable at the script's
   --tt-mb 8192, the pending guard fix cannot change output at valid
   budgets, and the CI run covers the runtime path, not book generation.
-  **Flag for Wave 8 (orchestrator recommendation, owner to rule):** the
-  book is now produced via the SharedTT path, which the fixtures never
-  exercise; small-scale cross-path checks exist (40 fixture keys + the
-  endgame pipeline test vs the Owned path). Recommend Wave 8's sample
-  replay additionally RE-SOLVE a subset (~100 of the 1,000, ply ≥ 4)
-  with the runtime solver and compare scores — restoring gate #2's
-  "matches a full search" letter now that generation and runtime use
-  different TT implementations. Implementer report highlights: shared lock-free
+  **OWNER RULED 2026-07-28 — Wave 8 sample replay re-solves through the
+  runtime solver, with two amendments:** (1) coverage raised to 200
+  entries at ply ≥ 4 PLUS 5–10 entries at ply ≤ 3 despite minutes-each
+  cost — shallow entries are the book's most-used and the fixtures'
+  least-covered; (2) each re-solve uses a FRESH runtime solver per
+  entry, zero shared state with the book loader — anything less is the
+  same cross-contamination in a different coat. Selection seeded and
+  deterministic. The full replay + re-solve executes once the
+  production book/sample exist (slow re-solves live in a release-mode
+  dispatch/gate test, like the fixture suites); Wave 8 proves the
+  mechanism against a small self-generated rehearsal book. Wave 8
+  delegated 2026-07-28 with this ruling folded in. Implementer report highlights: shared lock-free
   `SharedTranspositionTable` (each entry one packed AtomicU64 word,
   Relaxed ordering; index = key % prime capacity, partial_key = key /
   capacity — exact Euclidean reconstruction, a match proves key equality;

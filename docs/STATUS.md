@@ -143,9 +143,21 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
   TT warming will improve it by an unknown factor, but "overnight" was
   never realistic as built. Also: progress lines are count-based
   (total/100 ≈ every 1,295 positions ≈ >1 h between lines at this rate)
-  — no early ETA visible in the log. Owner decision pending on the fix
-  (parallelise the solve loop / longer probe to measure TT-warming /
-  reduce depth). DO NOT launch the production run until ruled.
+  — no early ETA visible in the log. **OWNER RULED 2026-07-28:
+  parallelise (Wave 7.1, delegated, in flight).** Three pinned
+  requirements: shared LOCK-FREE TT tolerating racy reads (per-thread
+  tables kill cross-position warming, a mutex kills parallelism; scheme
+  + safety argument must be stated); serial-vs-parallel BYTE-IDENTICAL
+  book on a deterministic subset (via --max-positions; concurrency
+  corruption is invisible to downstream checks, which test the book
+  against itself); throughput re-measured with a real positions/sec
+  probe before done. Also: time-based progress/ETA lines every ≤60 s;
+  --threads flag; zero new dependencies; checkpoint stays flush-per-line
+  and line-atomic under concurrent writers. engine/src will change for
+  the shared table (first change since gate state) → after verifier
+  PASS, re-dispatch engine-release-fixtures CI to reconfirm exactness.
+  Verifier re-audit must include a FRESH kill-9/resume probe on the
+  parallel build. Production launch stays ON HOLD until all that lands.
 - **Depth-8 production run: OWNER runs `~/fourwise-launch.sh` from a
   plain Terminal** (per ruling 1 — never inside a Claude Code session).
   The script replaces the earlier inline command (which had a re-run

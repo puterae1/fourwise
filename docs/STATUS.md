@@ -149,14 +149,25 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
   get a throughput/utilisation floor in their audit criteria from now
   on.** Launch-script changes, if any, go through the orchestrator.
 
-- **Wave 9 — delegated 2026-07-28, running** (`web-ui`): book fetch
-  (BASE_URL-aware, non-blocking, silent degrade — the absent-book path
-  is the live state until generation completes), tactical fallback
-  wired into cap expiry per amended §3.1 (closes defect #1),
-  level-label qualification at its own surface (§3.1, defect #2),
-  terminal-display-beats-analysis (§3.2, defect #3), set_book_enabled
-  passthrough (no UI), stale-race + mutation-tested, headless-Chrome
-  screenshots required.
+- **Wave 9 — code COMPLETE 2026-07-29, committed `4b3d4eb`, verifier
+  audit RUNNING.** All three post-gate defects implemented: tactical
+  fallback at cap expiry (horizon map perfect 10 / strong 8 / fair 7 /
+  weak 3, fair/weak reusing their own score horizons under the
+  max_ply+1 convention), level-label qualifier as real rendered text
+  (role=status; screenshotted live on a genuine cap expiry),
+  terminal display overriding every column via copy.ts's single
+  seat-translation point (four seats hand-written). Book fetch:
+  BASE_URL-aware, non-blocking single-flight with retry-on-failure,
+  silent degrade; set_book_enabled passthrough (no UI). Move.origin
+  added additive-optional so the qualifier survives refresh. Tests
+  232→299; 8 live mutations each caught. Honest disclosure on record:
+  dev-server cold-start screenshot exercised the validation-reject
+  branch (SPA fallback serves HTML for missing book.bin), not the
+  HTTP-404 branch — 404 unit-tested; verifier instructed to close it
+  live against vite preview. Wave 10 note: once book.bin deploys,
+  re-check cold start on the production build and confirm the
+  qualifier fades from normal play (it currently fires early-game
+  precisely because the book is absent — expected).
 
 - **Wave 8 — verifier PASS 2026-07-28 (8/8), committed `9050e0c`;
   punch list COMPLETE, committed `6736a70` (ENGINE.md wasm-shape +

@@ -183,17 +183,29 @@ way before signature (recommendation: fix both now — each is small,
 web-only, and the same honesty/design class this phase existed to
 close). Awaiting owner signature; Phase 3 does not begin until given.
 
-**OWNER RULED 2026-07-29: both fixed BEFORE signature.** Wave 10.1
-delegated (web-ui): (1) win-line overlay per §9, line half; (2) parity
-ruler hides on game over; (3) SPEC §3.2 scope clarification WRITTEN
-and committed (`1109a30`) — terminal-beats-analysis covers every
-analysis-derived surface, phrased generally so the next surface added
-doesn't reproduce the defect; (4) owner-ordered class sweep: audit
-every analysis-derived surface for terminal survival (this is the
-SECOND defect class to recur in a new file, after red-as-user — the
-sweep is the countermeasure). Then verifier pass with live screenshots
-(ruler absent on a won game, win line rendered), then deploy, then
-signature.
+**OWNER RULED 2026-07-29: both fixed BEFORE signature — DONE.**
+Wave 10.1 (`125f402`): win-line SVG overlay (non-scaling-stroke 5px
+Frame / 2px n-0 through the win-cell centres, all directions, tokens
+byte-identical to §12, reduced-motion fully disabled via the global
+rule — verifier-confirmed it reaches SVG children); parity ruler gated
+on isGameOver. SPEC §3.2 class-wide clarification committed
+(`1109a30`), plus a scope-precision follow-up (`d250762`, from the
+verifier's clarity note): the rule covers PRESENT-TENSE claims about
+the current position; backward-looking provenance records (move-list
+partial badge, level qualifier) are exempt, with the falsity test
+written in so the distinction never needs re-deriving.
+**Owner-ordered class sweep COMPLETE:** ten analysis-derived surfaces
+enumerated; only the ruler was defective; blunder-flag terminal
+impossibility argued AND verified by code trace (two independent
+structural guards; counterexamples attempted, none found); raw-score
+staleness and pending-glyph short-circuits spot-checked independently.
+**Verifier pre-signature pass: PASS 6/6** with owner-required live
+screenshots (same-session ruler present→win→gone; horizontal win at
+desktop + diagonal at 360px, geometry pixel-exact against measured
+disc centres; reduced-motion emulated). Tests 302→309, four
+enumerated mutations re-applied/isolated/reverted.
+**DEPLOYED 2026-07-29: run 30398241459 green, fresh bundle live,
+book.bin still 200.** All owner conditions met — READY FOR SIGNATURE.
 
 - **Wave 7.2 — DIAGNOSED 2026-07-28, no engine code at fault, zero
   source changes.** Root causes, measured: (1) PRIMARY — external

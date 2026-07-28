@@ -102,13 +102,9 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
 
 ## In flight
 
-- **CI run 30334738699** (engine-release-fixtures, 240-min timeout,
-  dispatched 2026-07-28 06:25 UTC): re-runs all six fixture sets on current
-  code from a bare checkout. Five sets already confirmed exact on current
-  code by the earlier timed-out run; this run exists to close L1_R3 (the
-  last set resting on inference, not execution). Append its result to the
-  gate record when it lands. It is NOT a gate blocker — the gate was judged
-  and signed on the evidence as recorded.
+- **Wave 7** (`rust-engine`): book generator implementation, delegated
+  2026-07-28, running. Next: verifier audit, then the detached depth-8
+  overnight generation run.
 
 ## Done (continued — misfiled under "In flight" until 2026-07-28; every wave
 below is complete)
@@ -253,8 +249,13 @@ complete-shallow-at-cap), level-label honesty (§3.1), terminal-display
 (§3.2).
 
 **Orchestrator judgement: all five criteria MET. Gate recommendation:
-PASS.** **Owner signature given 2026-07-28: PASS.** Sole open follow-up:
-the 240-min L1_R3 re-dispatch (see In flight) — append result on landing.
+PASS.** **Owner signature given 2026-07-28: PASS.**
+**Criterion 1 residual CLOSED 2026-07-28 08:08 UTC: CI run 30334738699
+(240-min re-dispatch) completed green — log read, not just status:
+`test_l1_r3_begin_hard ... ok`, release suite 8/8 in 5,826 s, lib 28/28,
+position 20/20, on current code from a bare checkout. All six fixture
+sets are now execution-verified on current code; nothing in criterion 1
+rests on inference any more.**
 - **On-device evidence IN (owner, 2026-07-28, iPhone — Safari then
   Chrome, both clean): all six checks pass on the live URL.** Cold open →
   live board with engine move; ply-12+ analysis settles under a second

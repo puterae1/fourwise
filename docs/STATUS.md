@@ -4,11 +4,13 @@
 > conversation disagree, this file wins. Read `docs/ROADMAP.md` for the phase
 > gates and `docs/ORCHESTRATION.md` for who runs on what.
 
-**Last updated:** 2026-07-27 (Wave 1 complete; design direction done)
+**Last updated:** 2026-07-28 (Phase 1 gate SIGNED — PASS)
 
 ## Current phase
 
-**Phase 1 — Engine and seat model.** No gate criteria met yet.
+**Phase 2 — Opening book. Not started.** Phase 1 gate passed and owner-signed
+2026-07-28. Phase 2 wave breakdown proposed, awaiting owner approval; no
+Phase 2 delegation happens until the breakdown is approved and recorded here.
 
 ## Done
 
@@ -100,6 +102,17 @@
 
 ## In flight
 
+- **CI run 30334738699** (engine-release-fixtures, 240-min timeout,
+  dispatched 2026-07-28 06:25 UTC): re-runs all six fixture sets on current
+  code from a bare checkout. Five sets already confirmed exact on current
+  code by the earlier timed-out run; this run exists to close L1_R3 (the
+  last set resting on inference, not execution). Append its result to the
+  gate record when it lands. It is NOT a gate blocker — the gate was judged
+  and signed on the evidence as recorded.
+
+## Done (continued — misfiled under "In flight" until 2026-07-28; every wave
+below is complete)
+
 - **Wave 5a — product: COMPLETE, verifier PASS 2026-07-28** (after one
   FAIL round). Analysis panel with visible throws-away-win badge (initially
   attribute-only with no CSS — invisible to sighted users; caught by
@@ -171,7 +184,8 @@
   artifact — human move played, engine replied with the honest partial
   badge, role-based control defaults live.
 
-## PHASE 1 GATE RECORD (assembled 2026-07-28, owner sign-off pending)
+## PHASE 1 GATE RECORD (assembled 2026-07-28 — **SIGNED: owner ruled PASS
+2026-07-28. Phase 1 is closed.**)
 
 **Criterion 1 — every reference fixture returns its exact score: MET, on
 native evidence, bridged — not re-measured — in wasm.** Evidence: the
@@ -239,7 +253,8 @@ complete-shallow-at-cap), level-label honesty (§3.1), terminal-display
 (§3.2).
 
 **Orchestrator judgement: all five criteria MET. Gate recommendation:
-PASS.** Awaiting owner signature; Phase 2 does not begin until given.
+PASS.** **Owner signature given 2026-07-28: PASS.** Sole open follow-up:
+the 240-min L1_R3 re-dispatch (see In flight) — append result on landing.
 - **On-device evidence IN (owner, 2026-07-28, iPhone — Safari then
   Chrome, both clean): all six checks pass on the live URL.** Cold open →
   live board with engine move; ply-12+ analysis settles under a second
@@ -273,12 +288,10 @@ PASS.** Awaiting owner signature; Phase 2 does not begin until given.
 | `verifier` | Sonnet, read-only | gate audits; runs before any wave or phase is declared done |
 | `design-lead` | Opus, one-shot (done) | `docs/DESIGN-DIRECTION.md` only; runs headless via `claude -p --model opus` — the subagent model floor cannot be lifted mid-session |
 
-## Remaining waves — Phase 1
+## Phase 1 wave plan (HISTORICAL — all waves complete, gate signed)
 
 Reconstructed from `docs/ROADMAP.md` + `docs/ENGINE.md` after the original plan
-text was lost in a context handover. Owner may re-cut these.
-
-Waves 3 and 4 are complete (see Done). Remaining:
+text was lost in a context handover. Kept as record of what each wave covered:
 
 - **Wave 4 (complete — record)** (`web-ui`; design-lead already done), split in two, governed by
   the 2026-07-28 owner pins (SPEC §1 amended acceptance test, §3.1 level

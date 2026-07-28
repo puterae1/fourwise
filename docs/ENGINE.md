@@ -297,6 +297,100 @@ Ship as a static asset, fetch on load, consult before searching. Expected size i
 low single-digit megabytes. If it exceeds 10 MB, reduce the depth rather than adding
 a loading screen.
 
+**Book and tactical-fallback exports (Wave 8 addition, 2026-07-28, pinned from the
+implementation, verifier-confirmed).** Three more `#[wasm_bindgen]` exports, additive
+to the two above — nothing about `analyse`'s or `legal_moves`'s own name, parameters,
+0-indexing, or boundary mechanics changes:
+
+```rust
+#[wasm_bindgen]
+pub fn load_book(bytes: &[u8]) -> Result<JsValue, JsValue>;      // -> BookLoadResult
+#[wasm_bindgen]
+pub fn set_book_enabled(enabled: bool);
+#[wasm_bindgen]
+pub fn tactical_fallback(position: &str, max_ply: u32) -> Result<JsValue, JsValue>;  // -> TacticalAnalysis
+```
+
+`load_book` and `tactical_fallback` return `Result<JsValue, JsValue>` for the same
+mechanical reason `analyse` does (`wasm_bindgen`'s `Err` → thrown-exception plumbing),
+but **a corrupt or invalid book is never reported by throwing.** `load_book` always
+succeeds at the JS-visible level for well-formed input bytes of any content — a
+corrupt book is reported as `ok: false` inside the returned `BookLoadResult`, never as
+a thrown error, per the "corrupt or absent file is a silent fallback" pin below. The
+`Result` channel exists only for the (unreachable in normal operation)
+result-serialisation-failure case, exactly like `analyse`'s.
+
+`BookLoadResult` shape:
+
+```ts
+interface BookLoadResult {
+  ok: boolean;
+  entries: number;   // 0 when ok is false
+  depth: number;      // 0 when ok is false
+  error: string | null;  // null only via the TS wrapper's normalisation -- see below
+}
+```
+
+- `entries` is the book's entry count (`Book::len()`); `depth` is the book's stored
+  `--depth` byte. Both are `0` when `ok` is `false`.
+- **`error` arrives as `undefined`, not `null`, when absent** (`ok: true`) — the same
+  serde `Option<T>` → `undefined` mapping `AnalysisResult.best` already has. The typed
+  TS wrapper must normalise it to `null`, same rule as `best`.
+- Calling `load_book` again after a successful load, with bytes that fail to parse,
+  does **not** discard the previously-loaded good book — see `book.rs`'s
+  `load_book_into` for the runtime behaviour this reflects.
+
+`set_book_enabled(enabled: boolean): void` — the PERMANENT book-disabled flag. Once
+set `false`, every subsequent book lookup (from both `analyse` and
+`tactical_fallback`) misses, indistinguishable from no book ever having loaded,
+**regardless of any later `load_book` call** — loading a new book never implicitly
+re-enables it. Only an explicit `set_book_enabled(true)` re-enables. Exists so the
+tactical-fallback and plain-search paths can be exercised deliberately once the book
+is otherwise always available.
+
+`analyse` (unchanged export, updated behaviour) now consults the loaded-and-enabled
+book, if any, before falling through to search for each column's child position — a
+book hit costs no node budget at all. An absent, never-loaded, or disabled book is
+behaviourally identical to the pre-book `analyse`.
+
+`tactical_fallback(position, max_ply) -> TacticalAnalysis` is SPEC.md §3.1's
+2026-07-28 post-gate amendment: a COMPLETE search bounded by ply distance rather than
+node count, for the game layer to call on cap expiry instead of choosing among a
+partial deep search's unevenly-solved columns. It also consults the loaded-and-enabled
+book first, per column child, same as `analyse`. It shares no search state with the
+persistent `analyse` `Solver`/transposition table — it is a separate, self-contained,
+TT-free search.
+
+`TacticalAnalysis` shape:
+
+```ts
+type TacticalEval =
+  | { kind: 'score'; score: number }   // exact within the horizon, or an honest horizon-draw (0)
+  | { kind: 'full' };                  // column is full, no move exists
+
+interface TacticalAnalysis {
+  columns: TacticalEval[];  // length 7, index = 0-based column
+  best: number | null;      // 0-based; lowest-column tie-break, same rule as AnalysisResult.best
+}
+```
+
+Deliberately no `'unknown'` variant: unlike `ColumnEval`, `tactical_fallback` never
+leaves a column unresolved — every legal column returns either a `Full` or an exact
+`Score`, by construction, since the search is complete within its own horizon (a
+result beyond the horizon is reported as an honest `0`, not as `'unknown'`). `best`
+follows the same `Option<u32>` → `undefined` → (wrapper-normalised) `null` boundary
+mechanics as `AnalysisResult.best`, and is `null` only when every column is `Full`.
+
+**Horizon convention (pin).** `max_ply` plies are searched **from each child
+position** — i.e. AFTER the move into the column being evaluated — mirroring exactly
+how `analyse` hands each child the same `node_budget` rather than charging it for the
+"free" act of playing the move itself. So a caller of `tactical_fallback(pos, max_ply)`
+gets `max_ply + 1` total plies of information from `pos` (the analysed root),
+including the move actually played into each column. This is not a claim SPEC.md's
+§3.1 amendment pins itself; it is this implementation's own documented choice, made to
+keep `analyse` and `tactical_fallback` structurally consistent with each other (both
+being the two things the game layer's cap-expiry logic must call from the same site).
+
 ---
 
 ## Book format v1 (Wave 7, generator; Wave 8 implements the loader from this
@@ -413,6 +507,36 @@ Little-endian throughout.
 Total file size: `10 + count * 9` bytes. At the expected depth-8 scale
 (roughly 130k entries after mirror dedup) that is a couple of MB, comfortably
 under the 10 MB ceiling above.
+
+**Keys must be strictly ascending — a normative reading of "sorted ascending"
+above, pinned for Wave 8's loader.** `keys[i] < keys[i+1]` for every `i`; no
+repeats. A canonical key is a deduplication key by construction (see "What
+is in the book" above — transposition dedup and mirror dedup both collapse
+to one entry per canonical position), so two equal adjacent keys can only
+mean the file is corrupt, never a legitimate degenerate case. A loader must
+reject a file with a non-strictly-ascending key array as invalid, exactly
+like a bad-magic or truncated file (see "Lookup protocol" step 5).
+
+**A file whose length does not exactly equal `10 + count * 9` bytes is
+corrupt — trailing bytes are not "extra content to ignore".** The declared
+`count` and the file's own length must agree exactly. A file shorter than
+this is truncated (see "Lookup protocol" step 5); a file longer than this
+is equally invalid, not a forward-compatible extension point — this format
+has none. Both cases reject identically, as a corrupt/absent file.
+
+**Implementation note — the section-boundary arithmetic must be
+overflow-checked, not wrapping.** Computing the keys/scores section offsets
+from a caller-supplied `count` (`10 + count * 8`, `10 + count * 9`) must use
+checked arithmetic and reject on overflow, rather than panic or silently
+wrap. This is a genuine risk, not a defensive-programming nicety: on the
+`wasm32-unknown-unknown` target `usize` is 32 bits, so a corrupt or
+adversarially large `count` near `u32::MAX` can overflow a naive `usize`
+multiplication well before any real allocation is attempted — a byte blob
+that is otherwise short (nowhere near the multi-megabyte real book size)
+can still carry a `count` field large enough to trigger this. A 64-bit
+native build has enough headroom that the same `count` would instead simply
+fail the "file is long enough" length check normally, which is exactly why
+this risk is easy to miss testing only on a native target.
 
 Every key is stored in full (64 bits) specifically so the key-collision
 failure class the runtime transposition table accepts as a tradeoff

@@ -420,7 +420,7 @@ fn rehearsal_book_replay_matches_the_real_loader() {
 /// moves played"). Consistent with that established convention rather
 /// than inventing a different one for this file.
 #[test]
-#[ignore = "real search at ply 8; run in release: cargo test --release -- --ignored --include-ignored"]
+#[ignore = "real search at ply 8; run in release: cargo test --release --test book_replay -- --ignored"]
 fn rehearsal_book_resolve_matches_a_handful_of_fresh_solves() {
     let book_bytes = std::fs::read(fixture_path("book_rehearsal_v1.bin")).expect("rehearsal book fixture missing");
     let book = Book::load(&book_bytes).expect("the committed rehearsal book must be well-formed");
@@ -495,7 +495,7 @@ fn production_book_path() -> String {
 /// production artifacts are absent, so this can never be mistaken for a
 /// pass before the real depth-8 run lands.
 #[test]
-#[ignore = "release-mode gate #2 evidence against the production depth-8 book; run: cargo test --release -- --ignored --include-ignored"]
+#[ignore = "release-mode gate #2 evidence against the production depth-8 book; run: cargo test --release --test book_replay -- --ignored"]
 fn production_book_replay_and_resolve() {
     let book_path = production_book_path();
     let book_bytes = std::fs::read(&book_path).unwrap_or_else(|e| {

@@ -149,8 +149,30 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
   get a throughput/utilisation floor in their audit criteria from now
   on.** Launch-script changes, if any, go through the orchestrator.
 
-- **Wave 8 — code COMPLETE 2026-07-28, committed `9050e0c`, verifier
-  audit RUNNING.** Delivered: book.rs loader implemented STRICTLY from
+- **Wave 8 — verifier PASS 2026-07-28 (8/8), committed `9050e0c`;
+  post-audit punch list with implementer (doc/string only).**
+  Audit highlights beyond the checklist: verifier constructed its own
+  adversarial corrupt books (one-byte-short header, count=0+body,
+  keys-short-by-one) — all cleanly rejected; hand-played the TRAP_ROOT
+  "7375" position and confirmed the double threat and the horizon-0/1
+  boundary; ran the ignored production replay itself — fails LOUDLY
+  naming the missing artifacts; mutation-tested min→max and sign-flip
+  live (each caught by a different, correctly-targeted test — split
+  coverage, both real); wrote its own Node wasm smoke from scratch and
+  corroborated every export incl. the trap result; proved the fixtures
+  CI evidence TRANSFERS to 9050e0c (solver.rs diff empty across the
+  span; tt.rs changes touch only the generator's shared table, never
+  the runtime table). Deviation judged conforming: shallow re-solve
+  half via 8 constructed sequences (rehearsal sample is 100% ply-8).
+  Shared-solver honesty claim verified correct (an existing solver
+  test already proves shared==fresh outcomes; the ruling's value is
+  structural isolation). web suite 232/232 green, seat-model sweep
+  clean. PUNCH LIST before Wave 9 (assigned): ENGINE.md pins for
+  BookLoadResult/TacticalAnalysis shapes + export signatures + the
+  max_ply+1-total-plies convention; ENGINE.md normative pins for the
+  three doc-gap calls; fix the invalid --ignored --include-ignored
+  string in book_replay.rs. Evidence-hygiene note: commit/scratchpad
+  the smoke script next time. Delivered: book.rs loader implemented STRICTLY from
   ENGINE.md (three real doc gaps found and resolved conservatively —
   duplicates rejected, trailing bytes = corrupt, checked arithmetic
   for wasm32 usize; ENGINE.md amendments due post-audit); tactical.rs

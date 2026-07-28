@@ -1,0 +1,46 @@
+/* Parity ruler — docs/DESIGN-DIRECTION.md §10. Lives beside the board frame,
+ * on the page (not inside the dark slab), so the neutral tokens below
+ * (assumed light-background) hold their contrast. */
+
+.parity-ruler__row {
+  height: var(--cell);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.parity-ruler__bar {
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: transparent;
+}
+
+.parity-ruler__row[data-active='true'] .parity-ruler__bar {
+  background: var(--c-signal);
+}
+
+.parity-ruler__number {
+  font-family: var(--f-body);
+  font-weight: var(--w-body-strong);
+  font-size: var(--t-micro-size);
+  line-height: var(--t-micro-lh);
+  color: var(--c-n-5);
+  font-variant-numeric: tabular-nums;
+}
+
+.parity-ruler__row[data-active='true'] .parity-ruler__number {
+  color: var(--c-n-9);
+}
+
+.parity-ruler__caption {
+  font-family: var(--f-body);
+  font-size: var(--t-micro-size);
+  line-height: var(--t-micro-lh);
+  color: var(--c-n-5);
+  text-align: center;
+  margin: var(--sp-1) auto 0;
+  max-width: calc(var(--cell) * 7);
+}

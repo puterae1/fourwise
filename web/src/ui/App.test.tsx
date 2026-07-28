@@ -164,6 +164,38 @@ describe('seat model — colour and turn order are independent (CLAUDE.md invari
   });
 });
 
+describe('parity ruler (SPEC §2, amended)', () => {
+  afterEach(() => {
+    // Restore a normal width after any test that narrows it.
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1024 });
+  });
+
+  it('labels the user\'s rows for the stored seat (firstMover: red, userColour: red -> user moves first -> odd rows)', () => {
+    render(<App />);
+    expect(screen.getByText('Waiting threats — yours on rows 1·3·5')).toBeInTheDocument();
+  });
+
+  it('tracks a seat change: flipping firstMover to yellow makes the user move second -> even rows', () => {
+    render(<App />);
+    fireEvent.click(within(firstMoverGroup()).getByRole('radio', { name: 'Yellow' }));
+    expect(screen.getByText('Waiting threats — yours on rows 2·4·6')).toBeInTheDocument();
+  });
+
+  it('hides entirely (no label, no highlight row markup) below the minimum viewport width -- never shows unlabelled', () => {
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 200 });
+    render(<App />);
+    expect(screen.queryByText(/Waiting threats/)).not.toBeInTheDocument();
+    expect(document.querySelector('.parity-ruler__row')).not.toBeInTheDocument();
+  });
+
+  it('is absent in Setup mode -- no label and no gutter marks, even at a normal viewport width', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('tab', { name: 'SETUP' }));
+    expect(screen.queryByText(/Waiting threats/)).not.toBeInTheDocument();
+    expect(document.querySelector('.parity-ruler__row')).not.toBeInTheDocument();
+  });
+});
+
 describe('keyboard control', () => {
   it('digit keys drop a disc, "u" undoes, "r" redoes (jump-to-ply reflects each)', () => {
     render(<App />);

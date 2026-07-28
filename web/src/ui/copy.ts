@@ -8,7 +8,7 @@
 // whether a side is engine-controlled) — never a win/loss/draw judgement.
 
 import type { Colour, Seat } from '../game/seat.js';
-import type { Verdict } from '../game/verdict.js';
+import type { Verdict, VerdictKind } from '../game/verdict.js';
 import type { SideControl } from './types.js';
 
 export function capitalize(sentence: string): string {
@@ -70,4 +70,20 @@ export function namedColumnFull(column: number): string {
 
 export function namedColumnUnknown(column: number): string {
   return `Column ${column + 1}. Still solving this column.`;
+}
+
+/**
+ * The Play-mode blunder line (design §8.1, copy §11: "That threw away a
+ * win. Column 4 held it."). `beforeKind` is the verdict just before the
+ * move — the ONLY thing that changes the wording is whether a win or a draw
+ * was given up; a draw thrown away reads oddly as "threw away a win", so
+ * draw -> loss gets its own clause. `beforeKind` is never `'loss'` in
+ * practice (SPEC §3.2 amended Firing rule: the flag only fires when the
+ * verdict strictly degrades, and a loss cannot degrade further) — if it ever
+ * were, this falls back to the win clause rather than fabricating a third
+ * sentence for a case that cannot occur.
+ */
+export function blunderSentence(beforeKind: VerdictKind, bestColumn: number): string {
+  const clause = beforeKind === 'draw' ? 'That threw away the draw.' : 'That threw away a win.';
+  return `${clause} Column ${bestColumn + 1} held it.`;
 }

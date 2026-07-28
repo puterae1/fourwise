@@ -100,7 +100,26 @@
 
 ## In flight
 
-Nothing. No agents running.
+- **Wave 5a — product: COMPLETE, verifier PASS 2026-07-28** (after one
+  FAIL round). Analysis panel with visible throws-away-win badge (initially
+  attribute-only with no CSS — invisible to sighted users; caught by
+  verifier, fixed, confirmed via headless-Chrome screenshot of the real
+  CSS), blunder flag UI (verdict-only firing per amended §3.2, end-to-end
+  async suite against a responding fake client incl. stale-race tests,
+  mutation-tested by the implementer), parity ruler (labelled
+  waiting-threats-only per amended §2, hides-not-degrades, absent in
+  Setup). 156 web tests. Class-wide sweep: attribute-set-but-never-styled
+  has no other instances; the dead FakeWorker (4b-era) hollowed nothing
+  claimed, but analysis-dependent DOM rendering had no coverage — the
+  responding-fake pattern now exists; lamp DOM test assigned to 5b.
+
+## In flight
+
+Next: **Wave 5b — plumbing**: game-state persistence, versioned JSON
+export/import (envelope `{version, exported, games[]}`, three distinct
+import rejections), desktop rail per §8.4 (re-sorts on REVEAL, whenever
+reveal happens, not on mode), lamp-reveal DOM test, corrupt-stored-seat
+test, stale calibration comment.
 
 ## Ownership
 

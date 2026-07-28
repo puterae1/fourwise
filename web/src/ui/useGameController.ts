@@ -28,12 +28,13 @@ import {
 } from '../game/gameState.js';
 import { colourAtPly, otherColour, type Colour, type Seat } from '../game/seat.js';
 import type { Grid } from '../game/setup.js';
-import { translateAnalysis, type TranslatedAnalysis } from '../game/verdict.js';
+import { translateAnalysis, translateScore, type TranslatedAnalysis, type VerdictKind } from '../game/verdict.js';
 import { LEVEL_THINK_MS, pickEngineMove, type Level } from '../game/levels.js';
 import { AnalysisSession } from '../game/analysisSession.js';
 import type { AnalysisResult } from '../engine/types.js';
 import type { Calibration, EngineClient } from '../engine/client.js';
 import { deriveBoard, type BoardDerivation } from './deriveBoard.js';
+import { checkForBlunder, type BlunderInput } from './blunderCheck.js';
 import type { Controls, Levels, SideControl } from './types.js';
 
 const ANALYSE_THINK_MS = 3000;
@@ -95,6 +96,24 @@ export interface GameController {
   rawScoresOn: boolean;
   setRawScoresOn: (on: boolean) => void;
 
+  /**
+   * The Play-mode blunder flag (SPEC §3.2, amended Firing rule) — set only
+   * after the USER's own human move degrades the position's verdict (win ->
+   * draw, draw -> loss, win -> loss), and only once the "after" position has
+   * a settled (complete or budget-exhausted) analysis to compare against;
+   * `null` otherwise, including while that comparison is still pending or
+   * came back partial. `beforeKind` is the verdict just before the move, for
+   * phrasing (`copy.ts`'s `blunderSentence`). Cleared automatically the
+   * moment the position changes again (undo/redo/jump/a further move) —
+   * this is keyed by position, not a timer, so nothing needs to remember to
+   * clear it.
+   */
+  blunder: { bestColumn: number; beforeKind: VerdictKind } | null;
+  /** Non-blocking manual dismiss for `blunder` (task requirement) — hides it
+   * for the CURRENT position only; it reappears if the position is left and
+   * revisited (e.g. undo then redo back to it). */
+  dismissBlunder: () => void;
+
   commitSetup: (grid: Grid, targetMode: 'play' | 'analyse') => { ok: true } | { ok: false; message: string };
 }
 
@@ -155,6 +174,25 @@ export function useGameController(client: EngineClient | null, initialSeat: Seat
   const [thinking, setThinking] = useState(false);
   const [analyseGate, setAnalyseGate] = useState<AnalyseGate>({ position: '', revealed: false, selected: null });
 
+  // Blunder flag (SPEC §3.2) bookkeeping. `pendingBlunderRef` is set the
+  // instant the user's own human move is played, capturing the verdict AS OF
+  // JUST BEFORE it (already on hand -- it's whatever was feeding the Play
+  // lamp) and the position that move landed on; the analysis effect below
+  // resolves it once that landing position's analysis settles (complete, or
+  // its think-budget exhausted), by comparing via `checkForBlunder`
+  // (`game/blunder.ts`'s `compareForBlunder`, untouched). `blunder` is keyed
+  // by the position it was raised for, so a later move/undo/jump makes it
+  // stale for free -- see `activeBlunder` near the bottom of this hook.
+  const pendingBlunderRef = useRef<{
+    afterPosition: string;
+    beforeInput: BlunderInput;
+    bestColumnBefore: number | null;
+  } | null>(null);
+  const [blunder, setBlunder] = useState<{ positionKey: string; bestColumn: number; beforeKind: VerdictKind } | null>(
+    null,
+  );
+  const [dismissedBlunderPosition, setDismissedBlunderPosition] = useState<string | null>(null);
+
   const sessionRef = useRef<AnalysisSession | null>(null);
   const calibrationRef = useRef<Calibration | null>(null);
 
@@ -191,14 +229,6 @@ export function useGameController(client: EngineClient | null, initialSeat: Seat
     (colour: Colour, value: Level) => setLevels((l) => ({ ...l, [colour]: value })),
     [],
   );
-
-  const play = useCallback((column: number) => {
-    setGame((g) => {
-      if (!g) return g;
-      const result = playMove(g, column);
-      return result.ok ? result.state : g;
-    });
-  }, []);
 
   const undo = useCallback(() => setGame((g) => (g ? gameUndo(g) : g)), []);
   const redo = useCallback(() => setGame((g) => (g ? gameRedo(g) : g)), []);
@@ -243,13 +273,15 @@ export function useGameController(client: EngineClient | null, initialSeat: Seat
     const position = enginePosition(activeGame);
     const mover = gameColourToMove(activeGame);
     const moverControl = controls[mover];
-    const showLampForThisMove = activeGame.mode === 'play' && mover === seat.userColour && moverControl === 'human';
-    const needsAnalysis = activeGame.mode === 'analyse' || moverControl === 'engine' || showLampForThisMove;
-
-    if (!needsAnalysis) {
-      setThinking(false);
-      return;
-    }
+    // Every non-setup, non-terminal Play/Analyse position gets analysed now,
+    // not only when the engine needs a move or the lamp needs lighting: the
+    // blunder flag (SPEC §3.2) has to compare the verdict just AFTER the
+    // user's move against the verdict just before it, and that "after"
+    // position is frequently the OPPONENT's turn under human-vs-human or
+    // human-then-engine controls -- nothing else here would ever trigger
+    // that analysis otherwise. (`activeGame.mode` is 'play' or 'analyse' by
+    // construction at this point -- 'setup' and game-over already returned
+    // above.)
 
     let cancelled = false;
     setThinking(true);
@@ -283,6 +315,26 @@ export function useGameController(client: EngineClient | null, initialSeat: Seat
 
       setRawAnalysis({ position: tokened.position, result: tokened.result });
       setThinking(false);
+
+      // Resolve a pending blunder check the moment ITS landing position's
+      // analysis settles -- whether that's `complete: true` or the level's
+      // think-budget simply ran out. Only ever consumed once; a later move
+      // overwrites/clears `pendingBlunderRef` before this can run again for
+      // an abandoned position (see `play` below).
+      const pending = pendingBlunderRef.current;
+      if (pending && pending.afterPosition === position) {
+        pendingBlunderRef.current = null;
+        const bestColumn = tokened.result.best;
+        const bestEval = bestColumn !== null ? tokened.result.columns[bestColumn] : undefined;
+        const afterVerdict =
+          bestEval?.kind === 'score' ? translateScore(bestEval.score, absolutePly(activeGame), tokened.result.sideToMove, seat) : null;
+        const afterInput: BlunderInput =
+          tokened.result.complete && afterVerdict ? { evaluated: true, kind: afterVerdict.kind } : { evaluated: false };
+        const check = checkForBlunder(pending.beforeInput, afterInput);
+        if (check.status === 'blunder' && pending.bestColumnBefore !== null && check.beforeKind !== null) {
+          setBlunder({ positionKey: position, bestColumn: pending.bestColumnBefore, beforeKind: check.beforeKind });
+        }
+      }
 
       if (activeGame.mode === 'play' && moverControl === 'engine') {
         const chosen = pickEngineMove(tokened.result, ply, levels[mover]);
@@ -320,6 +372,43 @@ export function useGameController(client: EngineClient | null, initialSeat: Seat
   );
   const rawColumns = analysisIsCurrent && rawAnalysis ? rawAnalysis.result.columns : null;
 
+  // `play` captures the blunder-check "before" state at the moment the move
+  // is made -- scoped to the USER's own human moves in Play mode (see the
+  // controller's `blunder` doc comment): that's the one case where
+  // `translated`/`board`/`seat`/`controls` from THIS render are exactly the
+  // state the move is being played from, with no perspective-flip ambiguity
+  // (the translated verdict is already framed in the user's own seat, so
+  // "before" and "after" compare on the same scale regardless of whose turn
+  // it becomes next).
+  const play = useCallback(
+    (column: number) => {
+      setGame((g) => {
+        if (!g) return g;
+        const result = playMove(g, column);
+        if (!result.ok) return g;
+
+        const mover = gameColourToMove(g);
+        const isUsersOwnHumanMove =
+          g.mode === 'play' && !board.isGameOver && mover === seat.userColour && controls[seat.userColour] === 'human';
+
+        if (isUsersOwnHumanMove) {
+          const beforeInput: BlunderInput =
+            translated?.complete && translated.position ? { evaluated: true, kind: translated.position.kind } : { evaluated: false };
+          pendingBlunderRef.current = {
+            afterPosition: enginePosition(result.state),
+            beforeInput,
+            bestColumnBefore: translated?.best ?? null,
+          };
+        } else {
+          pendingBlunderRef.current = null;
+        }
+
+        return result.state;
+      });
+    },
+    [board.isGameOver, seat, controls, translated],
+  );
+
   const gateIsCurrent = analyseGate.position === positionKey;
   const analyseRevealed = gateIsCurrent && analyseGate.revealed;
   const analyseSelected = gateIsCurrent ? analyseGate.selected : null;
@@ -349,6 +438,19 @@ export function useGameController(client: EngineClient | null, initialSeat: Seat
       })),
     [effectiveGame.moves, effectiveGame.setupPrefix, seat],
   );
+
+  // `blunder` is stale the instant the position moves on (a further move,
+  // undo, redo or jump) -- keying by `positionKey` rather than clearing it
+  // imperatively means every one of those already invalidates it for free.
+  // `dismissedBlunderPosition` hides it manually for THIS position only
+  // (task requirement: non-blocking, dismissible) without discarding the
+  // underlying result, so undoing then redoing back to the same position
+  // shows it again.
+  const activeBlunder =
+    blunder && blunder.positionKey === positionKey && dismissedBlunderPosition !== positionKey
+      ? { bestColumn: blunder.bestColumn, beforeKind: blunder.beforeKind }
+      : null;
+  const dismissBlunder = useCallback(() => setDismissedBlunderPosition(positionKey), [positionKey]);
 
   const commitSetup = useCallback(
     (grid: Grid, targetMode: 'play' | 'analyse') => {
@@ -400,6 +502,8 @@ export function useGameController(client: EngineClient | null, initialSeat: Seat
     setMarkersOn,
     rawScoresOn,
     setRawScoresOn,
+    blunder: activeBlunder,
+    dismissBlunder,
     commitSetup,
   };
 }

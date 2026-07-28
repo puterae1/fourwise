@@ -14,7 +14,10 @@
 .board__topbar {
   position: relative;
   height: 24px;
-  padding-left: var(--parity-gutter);
+  /* The grid's own left edge sits `--parity-gutter` (the external ruler,
+   * §10) plus the board frame's own padding (`--sp-2`) from the board's left
+   * edge — see `.board__body`/`.board__parity-gutter`/`.board__frame` below. */
+  padding-left: calc(var(--parity-gutter) + var(--sp-2));
 }
 
 .board__labels {
@@ -60,7 +63,9 @@
 .board__lamp-caret {
   position: absolute;
   bottom: 0;
-  left: calc(var(--parity-gutter) + var(--cell) * var(--lamp-col) + var(--cell) / 2 - 7px);
+  left: calc(
+    var(--parity-gutter) + var(--sp-2) + var(--cell) * var(--lamp-col) + var(--cell) / 2 - 7px
+  );
   width: 14px;
   height: 9px;
   clip-path: polygon(0 0, 100% 0, 50% 100%);
@@ -71,7 +76,9 @@
 .board__played-wedge {
   position: absolute;
   top: 1px;
-  left: calc(var(--parity-gutter) + var(--cell) * var(--played-col) + var(--cell) / 2 - 5px);
+  left: calc(
+    var(--parity-gutter) + var(--sp-2) + var(--cell) * var(--played-col) + var(--cell) / 2 - 5px
+  );
   width: 10px;
   height: 6px;
   clip-path: polygon(0 0, 100% 0, 50% 100%);
@@ -79,17 +86,33 @@
   opacity: 0.6;
 }
 
+.board__body {
+  display: flex;
+  align-items: flex-start;
+}
+
+/* The parity ruler's gutter (design §10) — deliberately OUTSIDE the dark
+ * frame, on the page, so `--c-n-9`/`--c-n-5` (light-background tokens) read
+ * correctly. Its content is `ParityRuler.tsx`'s `<ParityGutter>`, or nothing
+ * at all when the caller passes `parityUserRows={null}` — see SPEC §2's
+ * amended Presentation rule: never an unlabelled highlight. */
+.board__parity-gutter {
+  width: var(--parity-gutter);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  /* Matches the frame's own padding (--sp-2) plus the column button's own
+   * padding (--sp-1), so row centres line up with the actual disc rows. */
+  padding: calc(var(--sp-2) + var(--sp-1)) 0;
+}
+
 .board__frame {
   display: flex;
+  flex: 1;
   background: var(--c-frame);
   border-radius: var(--r-lg);
   box-shadow: var(--el-board);
   padding: var(--sp-2);
-}
-
-.board__gutter {
-  width: var(--parity-gutter);
-  flex-shrink: 0;
 }
 
 .board__grid {

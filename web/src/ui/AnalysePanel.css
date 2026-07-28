@@ -111,6 +111,41 @@
   color: var(--c-n-0);
 }
 
+/* SPEC §3.2's "Rank" bullet: a column that throws the win away must be
+ * flagged DISTINCTLY from one that was already losing (verifier audit,
+ * Wave 5a) -- visible to sighted users, not just present as a DOM attribute
+ * / aria-label, and not colour-only (SPEC §6): a solid ink chip, the same
+ * "no hue, form instead" treatment as the win/draw/loss bars themselves.
+ * Distinct on sight from the plain outline-loss bar it sits under (no chip
+ * at all) and from the muted, quiet `.verdict-cell__note` above. */
+.verdict-cell__flag {
+  font-family: var(--f-body);
+  font-weight: var(--w-body-strong);
+  font-size: var(--t-micro-size);
+  line-height: var(--t-micro-lh);
+  letter-spacing: 0.02em;
+  color: var(--c-n-0);
+  background: var(--c-n-9);
+  border-radius: var(--r-sm);
+  padding: 1px var(--sp-1);
+}
+
+.verdict-cell[data-invert='true'] .verdict-cell__flag {
+  color: var(--c-n-9);
+  background: var(--c-n-0);
+}
+
+.verdict-cell__note {
+  font-family: var(--f-body);
+  font-size: var(--t-micro-size);
+  line-height: var(--t-micro-lh);
+  color: var(--c-n-5);
+}
+
+.verdict-cell[data-invert='true'] .verdict-cell__note {
+  color: var(--c-n-2);
+}
+
 .verdict-cell__raw {
   font-family: var(--f-body);
   font-size: var(--t-micro-size);

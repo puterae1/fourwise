@@ -18,7 +18,10 @@ import { AnalysePanel } from './AnalysePanel.js';
 import { SetupPanel } from './SetupPanel.js';
 import { MoveList } from './MoveList.js';
 import { isColumnFull } from './deriveBoard.js';
+import { canShowParityRuler } from './ParityRuler.js';
+import { useViewportWidth } from './useViewportWidth.js';
 import {
+  blunderSentence,
   gameOverHeadline,
   namedColumnFull,
   namedColumnSentence,
@@ -26,7 +29,8 @@ import {
   positionSummary,
   turnContextLine,
 } from './copy.js';
-import type { Seat } from '../game/seat.js';
+import { userMovesFirst, type Seat } from '../game/seat.js';
+import { parityRows } from '../game/parity.js';
 import type { TranslatedAnalysis } from '../game/verdict.js';
 import './App.css';
 
@@ -41,6 +45,7 @@ function selectedColumnSentence(index: number, translated: TranslatedAnalysis | 
 
 function App() {
   const client = useEngineClient();
+  const viewportWidth = useViewportWidth();
 
   // First-run seat prompt (owner ruling, SPEC.md §1/§5): read once at
   // mount, never defaulted. A stored seat here means `useGameController`
@@ -133,7 +138,7 @@ function App() {
   // ---- headline slot ------------------------------------------------
   let contextLine: string | undefined;
   let sentence: string;
-  let variant: 'default' | 'error' = 'default';
+  let variant: 'default' | 'error' | 'blunder' = 'default';
 
   if (controller.mode === 'setup') {
     if (setup.rejection) {
@@ -147,9 +152,18 @@ function App() {
     const winnerControl = winner ? controller.controls[winner] : 'human';
     sentence = gameOverHeadline(controller.seat, winner, winnerControl);
   } else if (controller.mode === 'play') {
-    const mover = controller.turnColour!;
-    contextLine = turnContextLine(controller.seat, mover, controller.controls[mover]);
-    sentence = positionSummary(controller.translated?.position ?? null);
+    if (controller.blunder) {
+      // SPEC §3.2's blunder flag replaces the normal headline for as long as
+      // this position stands (design §8.1) -- non-blocking (the game already
+      // continued; this is purely presentational) and dismissible (task
+      // requirement) via `HeadlineSlot`'s `onDismiss`.
+      variant = 'blunder';
+      sentence = blunderSentence(controller.blunder.beforeKind, controller.blunder.bestColumn);
+    } else {
+      const mover = controller.turnColour!;
+      contextLine = turnContextLine(controller.seat, mover, controller.controls[mover]);
+      sentence = positionSummary(controller.translated?.position ?? null);
+    }
   } else {
     // analyse
     if (controller.analyseSelected !== null) {
@@ -169,6 +183,16 @@ function App() {
   const boardLastPlayed = isSetup ? null : controller.board.lastPlayedColumn;
   const boardOnDrop = isSetup ? setup.place : controller.play;
   const boardCanDrop = isSetup ? (col: number) => !isColumnFull(setup.grid, col) : controller.canDrop;
+
+  // ---- parity ruler ---------------------------------------------------
+  // SPEC §2 (amended): the ruler names the USER's rows, computed from
+  // `userMovesFirst` alone, and never appears without its "waiting threats
+  // only" label -- `canShowParityRuler` is the one place that "hide
+  // entirely, never unlabelled" decision is made (Setup gets its own `null`
+  // here for a separate, unrelated reason: freely placing discs isn't a turn
+  // sequence to have parity about).
+  const parityUserRows =
+    !isSetup && canShowParityRuler(viewportWidth) ? parityRows(userMovesFirst(controller.seat)).user : null;
 
   return (
     <div className="page">
@@ -196,7 +220,12 @@ function App() {
         onFirstMoverChange={controller.setFirstMover}
       />
 
-      <HeadlineSlot contextLine={contextLine} sentence={sentence} variant={variant} />
+      <HeadlineSlot
+        contextLine={contextLine}
+        sentence={sentence}
+        variant={variant}
+        onDismiss={variant === 'blunder' ? controller.dismissBlunder : undefined}
+      />
 
       <Board
         grid={boardGrid}
@@ -206,6 +235,7 @@ function App() {
         lastPlayedColumn={boardLastPlayed}
         onDrop={boardOnDrop}
         canDrop={boardCanDrop}
+        parityUserRows={parityUserRows}
       />
 
       <div className="page__action-slot">

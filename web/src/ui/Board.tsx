@@ -8,9 +8,11 @@
 import { useMemo } from 'react';
 import { BOARD_COLUMNS, BOARD_ROWS, type Grid } from '../game/setup.js';
 import type { Colour } from '../game/seat.js';
+import type { Row } from '../game/parity.js';
 import { landingRow } from './deriveBoard.js';
 import type { WinLine } from './deriveBoard.js';
 import type { CSSVars } from './cssVars.js';
+import { ParityCaption, ParityGutter } from './ParityRuler.js';
 import './Board.css';
 
 export interface BoardProps {
@@ -25,12 +27,28 @@ export interface BoardProps {
   lastPlayedColumn: number | null;
   onDrop: (column: number) => void;
   canDrop: (column: number) => boolean;
+  /** The user's zugzwang-parity rows (SPEC §2), or `null` when the ruler
+   * should not render at all this render — either because the mode doesn't
+   * call for it, or because `ParityRuler.canShowParityRuler` says the
+   * viewport can't fit the mandatory label. `Board` never decides this
+   * itself: passing `null` and passing rows are the caller's only two
+   * options, so an unlabelled highlight can't happen by construction. */
+  parityUserRows: Row[] | null;
 }
 
 const COLUMN_INDICES = Array.from({ length: BOARD_COLUMNS }, (_, i) => i);
 const ROWS_TOP_DOWN = Array.from({ length: BOARD_ROWS }, (_, i) => BOARD_ROWS - 1 - i);
 
-export function Board({ grid, winLine, turnColour, litColumn, lastPlayedColumn, onDrop, canDrop }: BoardProps) {
+export function Board({
+  grid,
+  winLine,
+  turnColour,
+  litColumn,
+  lastPlayedColumn,
+  onDrop,
+  canDrop,
+  parityUserRows,
+}: BoardProps) {
   const winCells = useMemo(() => {
     const set = new Set<string>();
     for (const c of winLine?.cells ?? []) set.add(`${c.column},${c.row}`);
@@ -69,48 +87,54 @@ export function Board({ grid, winLine, turnColour, litColumn, lastPlayedColumn, 
         </div>
       </div>
 
-      <div className="board__frame">
-        <div className="board__gutter" aria-hidden="true" />
-        <div className="board__grid" role="group" aria-label="Connect four board, columns 1 to 7">
-          {COLUMN_INDICES.map((col) => {
-            const landing = landingRow(grid, col);
-            const isFull = landing === null;
-            const interactive = canDrop(col);
-            const lit = col === litColumn;
-            return (
-              <button
-                key={col}
-                type="button"
-                className="board__column"
-                data-lit={lit}
-                disabled={!interactive}
-                aria-label={isFull ? `Column ${col + 1}, full` : `Drop in column ${col + 1}`}
-                onClick={() => onDrop(col)}
-              >
-                {ROWS_TOP_DOWN.map((row) => {
-                  const colour = grid[col]![row];
-                  return (
-                    <span
-                      key={row}
-                      className="board__cell"
-                      data-colour={colour ?? undefined}
-                      data-landing={row === landing}
-                      data-lit-well={lit && colour === null}
-                      data-win={winCells.has(`${col},${row}`)}
-                    >
-                      {colour && (
-                        <span className="board__disc" data-colour={colour}>
-                          <span className="disc-marker" aria-hidden="true" />
-                        </span>
-                      )}
-                    </span>
-                  );
-                })}
-              </button>
-            );
-          })}
+      <div className="board__body">
+        <div className="board__parity-gutter" aria-hidden="true">
+          {parityUserRows !== null && <ParityGutter userRows={parityUserRows} />}
+        </div>
+        <div className="board__frame">
+          <div className="board__grid" role="group" aria-label="Connect four board, columns 1 to 7">
+            {COLUMN_INDICES.map((col) => {
+              const landing = landingRow(grid, col);
+              const isFull = landing === null;
+              const interactive = canDrop(col);
+              const lit = col === litColumn;
+              return (
+                <button
+                  key={col}
+                  type="button"
+                  className="board__column"
+                  data-lit={lit}
+                  disabled={!interactive}
+                  aria-label={isFull ? `Column ${col + 1}, full` : `Drop in column ${col + 1}`}
+                  onClick={() => onDrop(col)}
+                >
+                  {ROWS_TOP_DOWN.map((row) => {
+                    const colour = grid[col]![row];
+                    return (
+                      <span
+                        key={row}
+                        className="board__cell"
+                        data-colour={colour ?? undefined}
+                        data-landing={row === landing}
+                        data-lit-well={lit && colour === null}
+                        data-win={winCells.has(`${col},${row}`)}
+                      >
+                        {colour && (
+                          <span className="board__disc" data-colour={colour}>
+                            <span className="disc-marker" aria-hidden="true" />
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
+
+      {parityUserRows !== null && <ParityCaption userRows={parityUserRows} />}
     </div>
   );
 }

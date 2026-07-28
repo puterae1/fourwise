@@ -78,6 +78,13 @@ from `userMovesFirst`. It updates when the seat changes.
 double threat wins immediately and is parity-independent. The UI must not imply
 otherwise — a common misunderstanding, and one the tool exists to correct.
 
+**Presentation rule (amended 2026-07-28, owner-approved).** An unlabelled row
+highlight will be read as "build here to win" — which is wrong precisely when
+the winning line is a double threat, i.e. most actual wins. The ruler must be
+labelled as what it is: waiting threats only (e.g. "waiting threats — yours on
+rows 1·3·5"), never presented as a general targeting guide. If the layout
+cannot fit an honest label, show nothing rather than an unlabelled highlight.
+
 ---
 
 ## 3. Modes
@@ -158,6 +165,13 @@ the verdict degrades (win → draw, draw → loss, win → loss), surface it imm
 with the move that should have been played. This is the feature that actually
 improves the user's play.
 
+**Firing rule (amended 2026-07-28, owner-approved).** The flag fires on VERDICT
+degradation only. It does not fire on speed loss (a win-in-9 played as a
+win-in-15): a flag that fires on every inefficiency becomes noise, gets
+ignored, and the one feature that improves play stops working. Speed loss may
+appear passively in the analysis panel; it is never the interrupting flag.
+Partial analyses never fire the flag — "not evaluated" per §3.1.
+
 ### 3.3 Setup
 Reconstruct an arbitrary position — for replaying a game that was lost at the table.
 
@@ -223,6 +237,12 @@ list of a Setup-derived game starts at the setup point.
 
 Explicit export and import as JSON, so a game archive can be moved between the
 laptop and the phone by hand.
+
+**Format versioning (amended 2026-07-28, owner-approved).** Every exported
+blob carries a top-level integer `version`, starting at 1. Import accepts the
+current and all older versions (migrating as needed) and rejects newer
+versions with a clear message, never a crash. Phase 3 will extend the game
+format; a Phase 1 export must still load then.
 
 ---
 

@@ -135,7 +135,17 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
   are written only at run completion, which happens detached.
 - **Depth-8 production run: OWNER runs it from a plain shell** (per
   ruling 1 — never inside a Claude Code session). Command on record:
-  `cd ~/Projects/fourwise/engine && cp /tmp/book_d4.bin.checkpoint ../web/public/book.bin.checkpoint 2>/dev/null; nohup cargo run --release --bin gen_book -- --depth 8 --tt-mb 8192 --verify-sample 1000 --seed 42 --out ../web/public/book.bin --resume > ~/fourwise-genbook-d8.log 2>&1 &`
+  ```
+  cd ~/Projects/fourwise/engine && \
+  cp /tmp/book_d4.bin.checkpoint ../web/public/book.bin.checkpoint 2>/dev/null; \
+  nohup caffeinate -i cargo run --release --bin gen_book -- \
+    --depth 8 --tt-mb 8192 --verify-sample 1000 --seed 42 \
+    --out ../web/public/book.bin --resume \
+    > ~/fourwise-genbook-d8.log 2>&1 &
+  ```
+  (`caffeinate -i` prevents idle sleep only — plug in and keep the lid
+  open, or set Energy Saver to never sleep. A sleep stalls, never kills;
+  re-running the identical command resumes from the checkpoint.)
   Progress: `grep gen_book ~/fourwise-genbook-d8.log | tail`. Kill-safe;
   re-run the same command to resume after any interruption. Writes the
   book atomically and `engine/tests/fixtures/book_sample_v1.json`

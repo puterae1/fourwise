@@ -1,0 +1,37 @@
+.colour-swatch {
+  position: relative;
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: var(--el-disc);
+  flex-shrink: 0;
+}
+
+.colour-swatch[data-colour='red'] {
+  background: var(--c-red);
+}
+
+.colour-swatch[data-colour='yellow'] {
+  background: var(--c-yellow);
+}
+
+.colour-swatch .disc-marker {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.colour-swatch[data-colour='red'] .disc-marker {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--c-marker-red);
+}
+
+.colour-swatch[data-colour='yellow'] .disc-marker {
+  width: 5px;
+  height: 5px;
+  background: var(--c-marker-yellow);
+}

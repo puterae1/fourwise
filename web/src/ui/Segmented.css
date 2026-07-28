@@ -1,0 +1,48 @@
+.segmented {
+  display: inline-flex;
+  background: var(--c-n-2);
+  border-radius: var(--r-full);
+  padding: 2px;
+  gap: 2px;
+}
+
+.segmented__option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-full);
+  font-family: var(--f-body);
+  font-size: var(--t-body-size);
+  font-weight: var(--w-body-strong);
+  color: var(--c-n-7);
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.segmented__option[data-checked='true'] {
+  background: var(--c-n-0);
+  color: var(--c-n-9);
+  box-shadow: var(--el-raised);
+}
+
+.segmented__input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.segmented__input:focus-visible + .segmented__label {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+.segmented__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}

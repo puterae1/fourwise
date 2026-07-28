@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "skipLibCheck": true,
@@ -9,11 +9,12 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
+    "jsx": "react-jsx",
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["node"]
+    "types": ["node", "vite/client"]
   },
-  "include": ["src/**/*.test.ts", "src/engine/wasm-test-helper.ts"]
+  "include": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/engine/wasm-test-helper.ts"]
 }

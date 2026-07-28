@@ -1,19 +1,143 @@
+/*
+ * Design tokens — docs/DESIGN-DIRECTION.md §12, verbatim. Do not invent new
+ * steps in the neutral ramp or new colours; the six named colours plus the
+ * seven `--c-n-*` steps are everything that exists.
+ */
+
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 400 900;
+  font-stretch: 62% 125%;
+  font-display: swap;
+  src: url('/fonts/Archivo-variable.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/InstrumentSans-variable.woff2') format('woff2');
+}
+
 :root {
-  --colour-bg: #14181c;
-  --colour-surface: #1e242b;
-  --colour-border: #333c46;
-  --colour-text: #e8ecef;
-  --colour-text-dim: #9aa5b1;
-  --colour-accent: #4fa3ff;
-  --colour-good: #3ecf8e;
-  --colour-bad: #ff6b6b;
-  --colour-unknown: #d9b64e;
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 1rem;
-  --space-4: 1.5rem;
-  --radius: 0.5rem;
-  --focus-ring: 0.1875rem solid var(--colour-accent);
+  /* ── palette ──────────────────────────────────────────── */
+  --c-kiln: #e9ecef;
+  --c-frame: #232830;
+  --c-well: #12161a;
+  --c-red: #c42b21;
+  --c-yellow: #f5b301;
+  --c-lamp-core: #ffe7c2;
+  --c-lamp-rim: #ff9f45;
+  --c-lamp-frame: #3a3128;
+  --c-signal: #0e5c6b;
+
+  /* neutrals — one ramp, no other steps */
+  --c-n-0: #f6f8f9;
+  --c-n-1: #e9ecef;
+  --c-n-2: #d6dbe0;
+  --c-n-3: #c2c9d0;
+  --c-n-5: #5a626b;
+  --c-n-7: #333a43;
+  --c-n-9: #232830;
+
+  /* semantic */
+  --c-page: var(--c-kiln);
+  --c-surface: var(--c-n-0);
+  --c-ink: var(--c-n-9);
+  --c-ink-muted: var(--c-n-5);
+  --c-focus: var(--c-signal);
+  --c-marker-red: rgba(255, 255, 255, 0.55);
+  --c-marker-yellow: rgba(0, 0, 0, 0.45);
+
+  /* ── type ─────────────────────────────────────────────── */
+  --f-display: 'Archivo', system-ui, sans-serif;
+  --f-body: 'Instrument Sans', system-ui, -apple-system, sans-serif;
+
+  --t-display-size: 2.5rem;
+  --t-display-lh: 0.95;
+  --t-numeral-size: 1.75rem;
+  --t-numeral-lh: 1;
+  --t-title-size: 1.25rem;
+  --t-title-lh: 1.2;
+  --t-label-size: 0.8125rem;
+  --t-label-lh: 1.2;
+  --t-body-lg-size: 1.0625rem;
+  --t-body-lg-lh: 1.45;
+  --t-body-size: 0.9375rem;
+  --t-body-lh: 1.5;
+  --t-micro-size: 0.6875rem;
+  --t-micro-lh: 1.3;
+
+  --w-display: 800;
+  --w-title: 700;
+  --w-label: 700;
+  --w-body: 400;
+  --w-body-strong: 600;
+  --wdth-display: 110;
+  --wdth-ui: 100;
+
+  /* ── space ────────────────────────────────────────────── */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --gutter: var(--sp-3);
+  --parity-gutter: 22px;
+
+  /* ── shape ────────────────────────────────────────────── */
+  --r-sm: 8px;
+  --r-md: 14px;
+  --r-lg: 22px;
+  --r-full: 999px;
+
+  /* ── depth ────────────────────────────────────────────── */
+  --el-board: 0 3px 0 #a9b2ba, 0 14px 28px -14px rgba(18, 22, 26, 0.55);
+  --el-raised: 0 2px 0 #cdd4da;
+  --el-disc: inset 0 3px 0 rgba(255, 255, 255, 0.3), inset 0 -3px 0 rgba(0, 0, 0, 0.28);
+
+  /* ── board metrics ────────────────────────────────────── */
+  --cell: clamp(42px, calc((100vw - 24px - 22px) / 7), 76px);
+  --disc-size: calc(var(--cell) * 0.82);
+  --web: calc(var(--cell) * 0.18);
+  --marker-ring: calc(var(--disc-size) * 0.52);
+  --marker-dot: calc(var(--disc-size) * 0.28);
+
+  /* ── motion ───────────────────────────────────────────── */
+  --dur-drop: 220ms;
+  --ease-drop: cubic-bezier(0.4, 0, 1, 0.6);
+  --dur-settle: 90ms;
+  --dur-lamp: 160ms;
+  --dur-lamp-move: 120ms;
+  --dur-ui: 120ms;
+  --ease-ui: ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-drop: 0ms;
+    --dur-settle: 0ms;
+    --dur-lamp: 0ms;
+    --dur-lamp-move: 0ms;
+    --dur-ui: 0ms;
+  }
+}
+
+@media (min-width: 900px) {
+  :root {
+    --t-display-size: 3.25rem;
+    --t-numeral-size: 2rem;
+    --gutter: var(--sp-6);
+  }
+}
+
+/* Markers are on by default; the toggle sets data-markers="off" on <html>. */
+[data-markers='off'] .disc-marker {
+  display: none;
 }
 
 * {
@@ -27,10 +151,11 @@ body {
 }
 
 body {
-  background: var(--colour-bg);
-  color: var(--colour-text);
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  line-height: 1.4;
+  background: var(--c-page);
+  color: var(--c-ink);
+  font-family: var(--f-body);
+  font-size: var(--t-body-size);
+  line-height: var(--t-body-lh);
 }
 
 #root {
@@ -38,14 +163,37 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
   color: inherit;
 }
 
+h1,
+h2,
+h3,
+p,
+dl,
+dd {
+  margin: 0;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Visible keyboard focus on every interactive element (SPEC §6) — never
+ * removed, always this exact treatment: docs/DESIGN-DIRECTION.md §10. */
 :focus-visible {
-  outline: var(--focus-ring);
+  outline: 3px solid var(--c-focus);
   outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
 }
 
 /* Disabled outright, not shortened — a fast pulse is still motion. */

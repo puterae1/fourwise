@@ -1,0 +1,106 @@
+.move-list-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 22, 26, 0.4);
+  display: flex;
+  align-items: flex-end;
+  z-index: 10;
+}
+
+.move-list-sheet {
+  background: var(--c-n-0);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  width: 100%;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: var(--sp-3);
+}
+
+@media (min-width: 900px) {
+  .move-list-overlay {
+    align-items: center;
+    justify-content: flex-end;
+  }
+  .move-list-sheet {
+    border-radius: var(--r-lg);
+    max-width: 360px;
+    margin-right: var(--sp-6);
+  }
+}
+
+.move-list-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-2);
+}
+
+.move-list-sheet__title {
+  font-family: var(--f-display);
+  font-weight: var(--w-title);
+  font-size: var(--t-title-size);
+}
+
+.move-list-sheet__close {
+  appearance: none;
+  border: none;
+  background: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.move-list__row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  appearance: none;
+  border: none;
+  background: none;
+  padding: var(--sp-2);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-family: var(--f-body);
+  font-size: var(--t-body-size);
+  min-height: 44px;
+}
+
+.move-list__row[data-current='true'] {
+  background: var(--c-frame);
+  color: var(--c-n-0);
+}
+
+.move-list__row:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: -2px;
+}
+
+.move-list__ply {
+  font-size: var(--t-micro-size);
+  color: var(--c-n-5);
+  width: 1.5em;
+  font-variant-numeric: tabular-nums;
+}
+
+.move-list__row[data-current='true'] .move-list__ply {
+  color: var(--c-n-2);
+}
+
+.move-list__column {
+  font-weight: var(--w-body-strong);
+}
+
+.move-list__partial {
+  margin-left: auto;
+  font-size: var(--t-micro-size);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--c-signal);
+}
+
+.move-list__row[data-current='true'] .move-list__partial {
+  color: var(--c-n-0);
+}

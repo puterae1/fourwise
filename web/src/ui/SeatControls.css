@@ -1,0 +1,24 @@
+.seat-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--gutter);
+}
+
+.seat-bar__control {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.seat-bar__caption {
+  font-family: var(--f-label, var(--f-display));
+  font-size: var(--t-label-size);
+  font-weight: var(--w-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-n-5);
+  white-space: nowrap;
+}

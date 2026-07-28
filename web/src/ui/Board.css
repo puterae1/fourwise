@@ -1,0 +1,221 @@
+/* The board — docs/DESIGN-DIRECTION.md §8-§10. A dark slab (--el-board) on
+ * the bright page, wells cut into it, discs with moulded gloss and a
+ * colour-blind marker, and the single warm backlight (§9). */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  width: 100%;
+  max-width: calc(var(--cell) * 7 + var(--parity-gutter) + var(--sp-4));
+  margin: 0 auto;
+}
+
+.board__topbar {
+  position: relative;
+  height: 24px;
+  padding-left: var(--parity-gutter);
+}
+
+.board__labels {
+  display: flex;
+  height: 100%;
+  align-items: flex-end;
+}
+
+.board__label {
+  width: var(--cell);
+  flex: 0 0 var(--cell);
+  text-align: center;
+  font-family: var(--f-display);
+  font-weight: var(--w-label);
+  font-size: var(--t-label-size);
+  line-height: var(--t-label-lh);
+  letter-spacing: 0.06em;
+  color: var(--c-n-5);
+  font-variant-numeric: tabular-nums;
+}
+
+.board__label[data-lit='true'] {
+  font-weight: 900;
+  color: var(--c-n-9);
+}
+
+.board__turn-caret {
+  position: absolute;
+  left: 2px;
+  top: 4px;
+  width: 12px;
+  height: 9px;
+  clip-path: polygon(50% 0, 0 100%, 100% 100%);
+  background: var(--caret-colour, transparent);
+  opacity: 1;
+  transition: opacity var(--dur-ui) var(--ease-ui);
+}
+
+.board__turn-caret[data-visible='false'] {
+  opacity: 0;
+}
+
+.board__lamp-caret {
+  position: absolute;
+  bottom: 0;
+  left: calc(var(--parity-gutter) + var(--cell) * var(--lamp-col) + var(--cell) / 2 - 7px);
+  width: 14px;
+  height: 9px;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  background: var(--c-lamp-rim);
+  transition: left var(--dur-lamp-move) ease-in-out, opacity var(--dur-lamp) ease-out;
+}
+
+.board__played-wedge {
+  position: absolute;
+  top: 1px;
+  left: calc(var(--parity-gutter) + var(--cell) * var(--played-col) + var(--cell) / 2 - 5px);
+  width: 10px;
+  height: 6px;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  background: var(--c-n-9);
+  opacity: 0.6;
+}
+
+.board__frame {
+  display: flex;
+  background: var(--c-frame);
+  border-radius: var(--r-lg);
+  box-shadow: var(--el-board);
+  padding: var(--sp-2);
+}
+
+.board__gutter {
+  width: var(--parity-gutter);
+  flex-shrink: 0;
+}
+
+.board__grid {
+  display: grid;
+  grid-template-columns: repeat(7, var(--cell));
+}
+
+.board__column {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: var(--sp-1) 0;
+  margin: 0;
+  width: var(--cell);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+  transition: background var(--dur-lamp) ease-out;
+}
+
+.board__column:disabled {
+  cursor: default;
+}
+
+.board__column[data-lit='true'] {
+  background: color-mix(in srgb, var(--c-lamp-frame) 55%, transparent);
+}
+
+.board__column:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+  z-index: 2;
+  position: relative;
+}
+
+.board__cell {
+  position: relative;
+  width: var(--cell);
+  height: var(--cell);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.board__cell::before {
+  content: '';
+  position: absolute;
+  width: var(--disc-size);
+  height: var(--disc-size);
+  border-radius: 50%;
+  background: var(--c-well);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  transition: background var(--dur-lamp) ease-out;
+}
+
+.board__cell[data-lit-well='true']::before {
+  background: var(--c-lamp-core);
+  box-shadow: inset 0 0 0 2px rgba(255, 159, 69, 0.45);
+}
+
+.board__column:hover .board__cell[data-landing='true']::after,
+.board__column:focus-visible .board__cell[data-landing='true']::after {
+  content: '';
+  position: absolute;
+  width: var(--disc-size);
+  height: var(--disc-size);
+  border-radius: 50%;
+  border: 2px dashed var(--c-n-3);
+}
+
+.board__cell[data-win='true'] .board__disc {
+  box-shadow: var(--el-disc), var(--el-raised);
+}
+
+.board__disc {
+  position: relative;
+  z-index: 1;
+  width: var(--disc-size);
+  height: var(--disc-size);
+  border-radius: 50%;
+  box-shadow: var(--el-disc);
+  animation: board-disc-drop calc(var(--dur-drop) + var(--dur-settle)) var(--ease-drop);
+}
+
+.board__disc[data-colour='red'] {
+  background: var(--c-red);
+}
+
+.board__disc[data-colour='yellow'] {
+  background: var(--c-yellow);
+}
+
+.disc-marker {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.board__disc[data-colour='red'] .disc-marker {
+  width: var(--marker-ring);
+  height: var(--marker-ring);
+  border: 2px solid var(--c-marker-red);
+  background: transparent;
+}
+
+.board__disc[data-colour='yellow'] .disc-marker {
+  width: var(--marker-dot);
+  height: var(--marker-dot);
+  background: var(--c-marker-yellow);
+}
+
+@keyframes board-disc-drop {
+  0% {
+    transform: translateY(calc(-1 * var(--cell) * 6));
+  }
+  71% {
+    transform: translateY(0) scaleY(1);
+  }
+  85% {
+    transform: translateY(0) scaleY(0.94);
+  }
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+}

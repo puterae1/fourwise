@@ -125,8 +125,19 @@ text was lost in a context handover. Owner may re-cut these.
     discard with forced-race test. Two verifier rounds: three test-coverage
     findings (incl. a decoy-stand-in vacuous assertion) found, fixed,
     independently re-verified. 95 web tests + engine baseline green.
-  - **4b — designed UI:** board per `docs/DESIGN-DIRECTION.md`, seat
-    controls, three modes, history with jump-to-ply, wired to 4a.
+  - **4b — designed UI: COMPLETE, verifier PASS 2026-07-28.** Board, seat
+    controls, three modes, history/keyboard, wired to 4a; 103 tests;
+    in-browser check green (Play loop, both seat axes incl. engine
+    auto-move on control handover, mode-switch preservation, Analyse gate,
+    honest still-solving states, Setup editor). Verifier: owner override
+    conformance verified, single-lamp rule structurally impossible to
+    violate, design tokens byte-identical to §12, honesty paths verified to
+    the DOM. Two items carried forward: (1) OWNER RULING NEEDED — default
+    seat is red/red on first load, textually matching DESIGN-DIRECTION §5's
+    forbidden "Red as a default" though the doc's own mockups depict
+    exactly that state; moot after Wave 5 persistence except on first run.
+    (2) Desktop rail (§8.4 best-first-after-reveal) not implemented —
+    assigned to Wave 5 polish.
 - **Wave 5** (`web-ui`): per-column analysis in plain language, blunder flag,
   parity ruler scoped to single threats, `localStorage` persistence.
 - **Wave 6** (`web-ui` + `verifier`): accessibility (keyboard, reduced motion,

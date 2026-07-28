@@ -22,5 +22,5 @@
     "types": ["vite/client"]
   },
   "include": ["src"],
-  "exclude": ["src/engine/worker.ts", "src/**/*.test.ts", "src/engine/wasm-test-helper.ts"]
+  "exclude": ["src/engine/worker.ts", "src/**/*.test.ts", "src/**/*.test.tsx", "src/engine/wasm-test-helper.ts"]
 }

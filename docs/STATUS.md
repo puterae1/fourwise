@@ -102,8 +102,41 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
 
 ## In flight
 
-- **Wave 7.1 — code COMPLETE 2026-07-28, committed `06e5a31`, verifier
-  re-audit RUNNING.** Implementer report highlights: shared lock-free
+- **Wave 7.1 — verifier PASS 2026-07-28 (7/7, one non-blocking finding;
+  fix in flight).** Verifier ran its OWN evidence, not the implementer's:
+  independent serial vs threads-10 vs threads-25 comparison at
+  --max-positions 100 — all three books SHA-256 identical; implementer's
+  six evidence books independently re-hashed, all match; fresh kill-9/
+  resume probe on the parallel build — 2,799-line checkpoint strict-
+  parsed (0 malformed, 0 duplicates), resume reported the exact skip
+  count, second kill at 4,255 lines with the pre-kill file a byte-
+  identical prefix; first progress line at 60.0 s (requirement met);
+  all three mutations RE-APPLIED live (not just judged) and caught,
+  split-lock caught 20/20 runs; sample-JSON move nondeterminism
+  independently root-caused (per-process HashMap seed) and every
+  differing sequence replayed to its claimed key via an independent
+  Python reimplementation — cosmetic, book unaffected.
+  **FINDING (assigned back to implementer, fix in flight):**
+  MIN_SAFE_CAPACITY is documented but never enforced at runtime;
+  `--tt-mb 0` (only) yields a tiny table whose 32-bit partial key
+  truncates ~49-bit keys — breaking match-implies-equality, a genuine
+  wrong-score risk. Unreachable at any default/planned/≥1 MB budget;
+  fix = clamp at the table constructors + reject --tt-mb 0 + tests.
+  **Release-fixtures CI re-dispatched on the new engine code: run
+  30367948450, in progress 2026-07-28 14:21 UTC** (fixtures exercise the
+  unchanged Owned-TT runtime path; verifier confirmed nothing in the
+  audit makes it a wasted run). **LAUNCH HOLD LIFTED — owner may run
+  ~/fourwise-launch.sh now:** the finding is unreachable at the script's
+  --tt-mb 8192, the pending guard fix cannot change output at valid
+  budgets, and the CI run covers the runtime path, not book generation.
+  **Flag for Wave 8 (orchestrator recommendation, owner to rule):** the
+  book is now produced via the SharedTT path, which the fixtures never
+  exercise; small-scale cross-path checks exist (40 fixture keys + the
+  endgame pipeline test vs the Owned path). Recommend Wave 8's sample
+  replay additionally RE-SOLVE a subset (~100 of the 1,000, ply ≥ 4)
+  with the runtime solver and compare scores — restoring gate #2's
+  "matches a full search" letter now that generation and runtime use
+  different TT implementations. Implementer report highlights: shared lock-free
   `SharedTranspositionTable` (each entry one packed AtomicU64 word,
   Relaxed ordering; index = key % prime capacity, partial_key = key /
   capacity — exact Euclidean reconstruction, a match proves key equality;

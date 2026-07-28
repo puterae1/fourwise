@@ -102,8 +102,23 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
 
 ## In flight
 
-- **Wave 7 — code complete, committed `1a54f72`, verifier audit running
-  2026-07-28.** Caught mid-wave executing the depth-4 rehearsal in-session
+- **Wave 7 — code COMPLETE, verifier PASS 2026-07-28 (10/10), committed
+  `1a54f72`. Depth-8 production run CLEARED for launch (owner's shell).**
+  Verifier highlights: suites clean (77 tests, clippy `-D warnings` no
+  suppressions), scope strictly the three files with zero dependency
+  changes (Cargo.lock diff empty; hand-rolled JSON/PRNG/CLI on purpose),
+  ENGINE.md Book-format-v1 judged self-sufficient for a cold Wave 8
+  implementation — including the mirror bit-arithmetic derivation and the
+  "no sign flip on mirror hit" trap called out explicitly; doc/code byte
+  layout agree; kill-safety verified incl. truncated-line tolerance; all
+  three mutation classes judged genuinely test-sensitive (read-only
+  judgement, per 5b precedent); honesty scan clean — the one shared-
+  algorithm test discloses its own limits, sample clamping is documented
+  AND tested. Carry-forward (not a blocker): the canonicalisation and
+  sortedness `debug_assert!`s compile out under `--release`, so the
+  production run trusts those invariants rather than re-checking them
+  live — they are exhaustively covered in debug tests. Wave 8 should keep
+  this in mind if it ever adds a release-mode integrity check. Caught mid-wave executing the depth-4 rehearsal in-session
   (1h49m in); owner ordered it killed — the rehearsal itself is a ~100-min
   job because the ply 0–4 tier (719 canonical positions) costs ~100 min of
   solve time on the M-series machine AT ANY DEPTH; this fixed cost does not

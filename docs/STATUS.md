@@ -116,12 +116,24 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
   independently root-caused (per-process HashMap seed) and every
   differing sequence replayed to its claimed key via an independent
   Python reimplementation — cosmetic, book unaffected.
-  **FINDING (assigned back to implementer, fix in flight):**
-  MIN_SAFE_CAPACITY is documented but never enforced at runtime;
-  `--tt-mb 0` (only) yields a tiny table whose 32-bit partial key
-  truncates ~49-bit keys — breaking match-implies-equality, a genuine
-  wrong-score risk. Unreachable at any default/planned/≥1 MB budget;
-  fix = clamp at the table constructors + reject --tt-mb 0 + tests.
+  **FINDING — FIXED `ffa999d`, verifier-confirmed CLOSED 2026-07-28:**
+  MIN_SAFE_CAPACITY was documented but never enforced; `--tt-mb 0`
+  (only) could truncate partial keys → wrong-score risk. Now clamped by
+  construction at the Shared constructors (verifier re-did the
+  arithmetic: quotient at the 2^18 floor = 2.13e9, inside u32 with 2×
+  margin for the real key space); `--tt-mb 0` rejected at parse,
+  exercised end-to-end on the release binary; plain TranspositionTable
+  deliberately unguarded (verifier grep-confirmed zero reachable
+  callers); post-fix book re-run SHA-256-identical to the pre-fix
+  baseline. Tests 98 total / 94 non-ignored (implementer's "93" claim
+  was wrong — verifier corrected it; suite itself green + clippy clean).
+  Two nits carried to Wave 8, neither reopening the gate: (1) the
+  `shared_table_round_trips_realistic_keys...` test's doc comment
+  overclaims — its round-trip half doesn't itself catch clamp removal
+  (keys don't collide at unclamped capacity 11); the embedded capacity
+  assertion and the dedicated clamp tests DO catch it (verified by
+  live mutation) — fix keys to `k`/`k + capacity` form or reword the
+  comment; (2) implementer report accuracy: test counts must be exact.
   **Release-fixtures CI re-dispatched on the new engine code: run
   30367948450, in progress 2026-07-28 14:21 UTC** (fixtures exercise the
   unchanged Owned-TT runtime path; verifier confirmed nothing in the

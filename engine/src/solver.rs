@@ -34,8 +34,10 @@
 //! `can_win_next` check inside the recursive loop; the `debug_assert!` at
 //! the top of `negamax` is what documents and checks that invariant.
 
+use std::sync::Arc;
+
 use crate::position::{column_mask, winning_positions, Position, HEIGHT, WIDTH};
-use crate::tt::{Bound, TranspositionTable};
+use crate::tt::{Bound, SharedTranspositionTable, TranspositionTable};
 
 /// Total playable cells on the board (7 * 6 = 42).
 const TOTAL_CELLS: i32 = (WIDTH * HEIGHT) as i32;
@@ -43,6 +45,40 @@ const TOTAL_CELLS: i32 = (WIDTH * HEIGHT) as i32;
 /// Column visit order for move generation: centre-out. Cheap and, per
 /// `docs/ENGINE.md`, a large effect on alpha-beta cutoff rate.
 const COLUMN_ORDER: [u32; WIDTH as usize] = [3, 2, 4, 1, 5, 0, 6];
+
+/// Either an exclusively-owned table (the default, single-threaded path --
+/// behaviourally identical to `Solver` before this type existed: `Owned`
+/// wraps the same `TranspositionTable`, with the same `&mut self` insert)
+/// or a table shared, lock-free, across multiple `Solver`s on different
+/// threads (used only by `tools/gen_book.rs`'s parallel book generator --
+/// see `tt::SharedTranspositionTable` for the concurrency safety argument).
+///
+/// `Solver`'s own per-instance state (`nodes`, `budget_limit`) is never
+/// shared regardless of which variant is in use; only the transposition
+/// table CACHE is, and only when `Shared` is chosen explicitly via
+/// `Solver::with_shared_tt`. Every existing construction path
+/// (`Solver::new`, `Solver::with_tt`) still produces `Owned`, so the WASM/
+/// runtime engine's behaviour is unchanged by this type's existence.
+enum TtHandle {
+    Owned(TranspositionTable),
+    Shared(Arc<SharedTranspositionTable>),
+}
+
+impl TtHandle {
+    fn get(&self, key: u64) -> Option<Bound> {
+        match self {
+            TtHandle::Owned(t) => t.get(key),
+            TtHandle::Shared(t) => t.get(key),
+        }
+    }
+
+    fn insert(&mut self, key: u64, bound: Bound) {
+        match self {
+            TtHandle::Owned(t) => t.insert(key, bound),
+            TtHandle::Shared(t) => t.insert(key, bound),
+        }
+    }
+}
 
 /// Marker returned by the budgeted search path when the node budget is
 /// exhausted before a definite score is reached. Carries no data -- the
@@ -61,7 +97,7 @@ pub struct Aborted;
 /// safe and intended to be reused across many `analyse` calls from a
 /// single long-lived instance.
 pub struct Solver {
-    tt: TranspositionTable,
+    tt: TtHandle,
     nodes: u64,
     /// `Some(n)` while a budgeted search is active: `n` is the absolute
     /// value `self.nodes` must reach before the search aborts (i.e. "nodes
@@ -83,7 +119,9 @@ impl Solver {
     /// `docs/ENGINE.md`.
     pub fn new() -> Self {
         Solver {
-            tt: TranspositionTable::with_byte_budget(crate::tt::DEFAULT_BYTE_BUDGET),
+            tt: TtHandle::Owned(TranspositionTable::with_byte_budget(
+                crate::tt::DEFAULT_BYTE_BUDGET,
+            )),
             nodes: 0,
             budget_limit: None,
         }
@@ -93,7 +131,23 @@ impl Solver {
     /// this for smaller tables to keep debug runs fast).
     pub fn with_tt(tt: TranspositionTable) -> Self {
         Solver {
-            tt,
+            tt: TtHandle::Owned(tt),
+            nodes: 0,
+            budget_limit: None,
+        }
+    }
+
+    /// Build a solver whose transposition table is a lock-free structure
+    /// SHARED with other `Solver`s -- typically one `Solver` per thread, all
+    /// holding a clone of the same `Arc`. Used only by
+    /// `tools/gen_book.rs`'s parallel book generator, where cross-position
+    /// TT warming across threads is the entire point of parallelising in
+    /// the first place. See `tt::SharedTranspositionTable`'s doc comment
+    /// for the concurrency safety argument. Every other construction path
+    /// (`new`, `with_tt`) is untouched by this method's existence.
+    pub fn with_shared_tt(tt: Arc<SharedTranspositionTable>) -> Self {
+        Solver {
+            tt: TtHandle::Shared(tt),
             nodes: 0,
             budget_limit: None,
         }

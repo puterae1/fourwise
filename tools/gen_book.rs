@@ -21,34 +21,66 @@
 //! ## CLI
 //!
 //! ```text
-//! gen_book --depth 8 --out book.bin --tt-mb 4096 --verify-sample 1000 --seed 42 [--resume]
+//! gen_book --depth 8 --out book.bin --tt-mb 4096 --verify-sample 1000 \
+//!          --seed 42 --threads N --max-positions N --sample-out PATH [--resume]
 //! ```
 //!
-//! See `Args::parse` for defaults. `--tt-mb` sizes a single `Solver`'s
-//! transposition table that is reused across every position solved this
-//! run (deepest ply first, so shallower positions inherit a warm table --
-//! see `solve_order`).
+//! See `Args::parse` for defaults. `--tt-mb` sizes ONE `SharedTranspositionTable`
+//! (Wave 7.1: shared, lock-free, across every worker thread -- see
+//! `solve_parallel` and `connect4_engine::tt::SharedTranspositionTable`'s doc
+//! comment for the concurrency design and safety argument) that is reused
+//! across every position solved this run (deepest ply first, so shallower
+//! positions inherit a warm table -- see `solve_order`).
+//!
+//! `--threads` (default: `std::thread::available_parallelism()`) sizes the
+//! worker pool. Every thread runs its own `Solver` but all of them share the
+//! one `SharedTranspositionTable`, which is the entire point of
+//! parallelising this way rather than giving each thread an isolated table:
+//! isolated tables would throw away the cross-position warming that makes
+//! later (shallower) solves in the run cheap.
+//!
+//! `--max-positions N` solves only the first `N` positions of the
+//! deterministic solve order (see `solve_order`), regardless of `--threads`
+//! -- the same fixed key SET is handed to the worker pool either way, just
+//! distributed across however many threads are running. This exists so a
+//! serial (`--threads 1`) and a parallel (`--threads N`) run over the same
+//! `--max-positions` value can be diffed byte-for-byte as a correctness
+//! check on parallelism itself, without paying for a full run. See
+//! `solve_parallel`'s doc comment for why this determinism holds.
+//!
+//! `--sample-out` overrides where the verification-sample JSON is written
+//! (default: `engine/tests/fixtures/book_sample_v1.json`, resolved via
+//! `CARGO_MANIFEST_DIR`). Exists so evidence/test runs never clobber the
+//! real fixture path.
 //!
 //! ## Resumability
 //!
 //! Every solved `(canonical key, score)` pair is appended, flushed, to a
 //! `<out>.checkpoint` text log as soon as it is known -- so a `kill -9`
-//! mid-run loses at most the one in-flight solve, never anything already
-//! written. `--resume` reloads that log and skips re-solving anything it
-//! already contains; without `--resume` a fresh run truncates any stale
-//! checkpoint first. The final book is written to a temp file and renamed
-//! into place (`write_book`), so a crash during the *final* write can never
-//! leave a half-written book at the real output path either.
+//! mid-run loses at most whatever was in flight across all worker threads
+//! at that instant, never anything already written. `--resume` reloads that
+//! log and skips re-solving anything it already contains; without
+//! `--resume` a fresh run truncates any stale checkpoint first. Concurrent
+//! writers share one `BufWriter` behind one `Mutex` (see `solve_parallel`'s
+//! `SolveState`), so every checkpoint line is written and flushed as a
+//! single, indivisible critical section -- lines from different threads can
+//! never interleave or tear, only interleave *between* whole lines. The
+//! final book is written to a temp file and renamed into place
+//! (`write_book`), so a crash during the *final* write can never leave a
+//! half-written book at the real output path either.
 
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use connect4_engine::position::{Position, HEIGHT, WIDTH};
 use connect4_engine::solver::Solver;
-use connect4_engine::tt::TranspositionTable;
+use connect4_engine::tt::SharedTranspositionTable;
 
 /// Bits allocated to each column in `Position::key()` -- see
 /// `docs/ENGINE.md`'s Representation section. Named separately from
@@ -62,13 +94,17 @@ const TOTAL_CELLS: u32 = WIDTH * HEIGHT;
 fn main() {
     let args = Args::parse(std::env::args().skip(1));
     println!(
-        "[gen_book] depth={} out={} tt_mb={} verify_sample={} seed={} resume={}",
+        "[gen_book] depth={} out={} tt_mb={} verify_sample={} seed={} resume={} threads={} \
+         max_positions={:?} sample_out={}",
         args.depth,
         args.out.display(),
         args.tt_mb,
         args.verify_sample,
         args.seed,
-        args.resume
+        args.resume,
+        args.threads,
+        args.max_positions,
+        args.sample_out.display(),
     );
 
     let enum_start = Instant::now();
@@ -89,7 +125,7 @@ fn main() {
     );
 
     let checkpoint_path = checkpoint_path_for(&args.out);
-    let mut scores: HashMap<u64, i8> = if args.resume {
+    let scores: HashMap<u64, i8> = if args.resume {
         load_checkpoint(&checkpoint_path)
     } else {
         let _ = fs::remove_file(&checkpoint_path);
@@ -97,7 +133,10 @@ fn main() {
     };
     let already_checkpointed = scores.len();
 
-    let order = solve_order(&canonical);
+    // `--max-positions` truncates the deterministic solve order itself
+    // (before the checkpoint filter below), so the exact same fixed key set
+    // is targeted regardless of `--threads` -- see `apply_max_positions`.
+    let order = apply_max_positions(solve_order(&canonical), args.max_positions);
     let to_solve: Vec<u64> = order
         .into_iter()
         .filter(|k| !scores.contains_key(k))
@@ -107,50 +146,35 @@ fn main() {
         "[gen_book] {already_checkpointed} positions already checkpointed, {total_to_solve} left to solve"
     );
 
-    let tt = TranspositionTable::with_byte_budget(args.tt_mb * 1024 * 1024);
-    let mut solver = Solver::with_tt(tt);
+    let scores = solve_parallel(
+        &canonical,
+        &to_solve,
+        args.tt_mb,
+        args.threads,
+        scores,
+        &checkpoint_path,
+        canonical.len(),
+    );
 
-    let checkpoint_file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&checkpoint_path)
-        .unwrap_or_else(|e| panic!("failed to open checkpoint {}: {e}", checkpoint_path.display()));
-    let mut checkpoint_writer = BufWriter::new(checkpoint_file);
-
-    let solve_start = Instant::now();
-    // Print roughly 100 times over the run, but never less often than every
-    // 2000 positions and never so often it floods a `nohup`-redirected log.
-    let progress_interval = (total_to_solve / 100).clamp(1, 2000);
-
-    for (solved_so_far, key) in to_solve.iter().enumerate() {
-        let entry = canonical
-            .get(key)
-            .expect("solve_order only ever returns keys present in canonical");
-        let score = solver.solve(&entry.pos);
-        let score_i8 = i8::try_from(score)
-            .unwrap_or_else(|_| panic!("score {score} for key {key:#x} does not fit in i8"));
-        scores.insert(*key, score_i8);
-        writeln!(checkpoint_writer, "{key:016x} {score}")
-            .expect("failed to append checkpoint line");
-        checkpoint_writer
-            .flush()
-            .expect("failed to flush checkpoint (resumability depends on this)");
-
-        let done = solved_so_far + 1;
-        if done % progress_interval == 0 || done == total_to_solve {
-            log_progress(done, total_to_solve, canonical.len(), solve_start.elapsed());
-        }
-    }
-
+    // Entries come from `canonical.keys()` filtered through `scores` (not
+    // straight from `scores`) so any stale checkpoint key that isn't part
+    // of THIS run's canonical set (e.g. a leftover from a different
+    // `--depth`) is silently excluded, exactly as the original serial
+    // implementation only ever wrote keys it recognised. Without
+    // `--max-positions`, every canonical key must have ended up solved --
+    // that invariant is worth checking explicitly rather than silently
+    // writing a truncated book.
     let mut entries: Vec<(u64, i8)> = canonical
         .keys()
-        .map(|k| {
-            let score = *scores
-                .get(k)
-                .expect("every canonical key must have a score by the time solving is done");
-            (*k, score)
-        })
+        .filter_map(|k| scores.get(k).map(|&s| (*k, s)))
         .collect();
+    if args.max_positions.is_none() {
+        assert_eq!(
+            entries.len(),
+            canonical.len(),
+            "every canonical key must have a score by the time solving is done (full run, no --max-positions)"
+        );
+    }
     entries.sort_unstable_by_key(|(k, _)| *k);
 
     write_book(&args.out, args.depth, &entries).unwrap_or_else(|e| {
@@ -165,14 +189,13 @@ fn main() {
 
     let sample_count = args.verify_sample.min(entries.len());
     let sample = sample_entries(&canonical, &entries, sample_count, args.seed);
-    let sample_path = default_sample_path();
-    write_sample_json(&sample_path, args.depth, args.seed, &sample).unwrap_or_else(|e| {
-        panic!("failed to write sample fixture to {}: {e}", sample_path.display())
+    write_sample_json(&args.sample_out, args.depth, args.seed, &sample).unwrap_or_else(|e| {
+        panic!("failed to write sample fixture to {}: {e}", args.sample_out.display())
     });
     println!(
         "[gen_book] wrote {} sample entries to {}",
         sample.len(),
-        sample_path.display()
+        args.sample_out.display()
     );
 }
 
@@ -187,6 +210,153 @@ fn log_progress(done: usize, total: usize, canonical_total: usize, elapsed: std:
     );
 }
 
+/// Truncate the deterministic solve order to its first `n` entries (`None`
+/// = no limit). Applied BEFORE the checkpoint-skip filter, so
+/// `--max-positions` always targets the same fixed prefix of the
+/// deterministic order regardless of what has already been checkpointed or
+/// how many threads end up solving it.
+fn apply_max_positions(mut order: Vec<u64>, max_positions: Option<usize>) -> Vec<u64> {
+    if let Some(n) = max_positions {
+        order.truncate(n);
+    }
+    order
+}
+
+// ---------------------------------------------------------------------
+// Parallel solve loop (Wave 7.1)
+// ---------------------------------------------------------------------
+
+/// Everything that must be touched under a single lock while a worker
+/// thread reports one solved position: the checkpoint writer (so lines from
+/// different threads can never interleave or tear -- only ever appear in
+/// some whole-line order), the accumulated scores map (so the final book
+/// build sees every solve, from whichever thread produced it), and the
+/// progress-line bookkeeping (`done`, `last_progress`).
+struct SolveState {
+    writer: BufWriter<File>,
+    scores: HashMap<u64, i8>,
+    done: usize,
+    last_progress: Instant,
+}
+
+/// Solve every key in `to_solve` using `threads` worker threads sharing one
+/// `SharedTranspositionTable`, appending a flushed checkpoint line for each
+/// as it completes, and returns `initial_scores` merged with every newly
+/// solved `(key, score)`.
+///
+/// **Determinism (why `--threads 1` and `--threads N` produce the identical
+/// resulting map, key for key and score for score):** which KEYS get
+/// solved is fixed entirely by `to_solve`, computed once before any thread
+/// starts -- `threads` only changes how a shared work-stealing cursor
+/// (`next_index`, a plain `AtomicUsize`) hands out indices into that same
+/// fixed slice, never which positions exist to be claimed. Each `Solver`'s
+/// own answer for a given position is exact and, by construction
+/// (`docs/ENGINE.md`'s determinism note; every value inserted into the
+/// shared table is a value `negamax` fully proved, never a partial or
+/// context-dependent one), independent of what the shared transposition
+/// table happens to contain when it runs -- a warm cache makes a solve
+/// *faster*, never different. So every thread, in whatever order it
+/// happens to run, computes the one true score for whatever key it claims,
+/// and the returned `HashMap` (unordered by construction, so insertion
+/// order is irrelevant to its final contents) ends up with exactly the same
+/// key/score pairs no matter how many threads did the work or how their
+/// work interleaved.
+fn solve_parallel(
+    canonical: &HashMap<u64, CanonicalEntry>,
+    to_solve: &[u64],
+    tt_mb: usize,
+    threads: usize,
+    initial_scores: HashMap<u64, i8>,
+    checkpoint_path: &Path,
+    canonical_total: usize,
+) -> HashMap<u64, i8> {
+    let threads = threads.max(1);
+    let total_to_solve = to_solve.len();
+    // Print roughly 100 times over the run, but never less often than every
+    // 2000 positions and never so often it floods a `nohup`-redirected log.
+    // This is the count-based half of the progress requirement; the
+    // time-based half (at least every 60s, so a fresh `nohup` log shows an
+    // ETA quickly even before 1% of a huge run is done) is enforced inside
+    // the critical section below via `last_progress`.
+    let progress_interval = (total_to_solve / 100).clamp(1, 2000);
+
+    let checkpoint_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(checkpoint_path)
+        .unwrap_or_else(|e| panic!("failed to open checkpoint {}: {e}", checkpoint_path.display()));
+
+    let state = Mutex::new(SolveState {
+        writer: BufWriter::new(checkpoint_file),
+        scores: initial_scores,
+        done: 0,
+        last_progress: Instant::now(),
+    });
+
+    // Wave 7.1's TT strategy: ONE shared, lock-free table (see
+    // `connect4_engine::tt::SharedTranspositionTable`'s doc comment for the
+    // full safety argument) rather than per-thread tables. Per-thread
+    // tables would kill the cross-position warming that makes later
+    // (shallower, per `solve_order`) solves cheap; a mutex around a single
+    // owned table would kill the parallelism this wave exists to add.
+    let tt = Arc::new(SharedTranspositionTable::with_byte_budget(tt_mb * 1024 * 1024));
+    let next_index = AtomicUsize::new(0);
+    let solve_start = Instant::now();
+
+    thread::scope(|scope| {
+        for _ in 0..threads {
+            let tt = Arc::clone(&tt);
+            let next_index = &next_index;
+            let state = &state;
+            scope.spawn(move || {
+                let mut solver = Solver::with_shared_tt(tt);
+                loop {
+                    // Work-stealing over a fixed, shared slice: every
+                    // thread races to claim the next unclaimed index, so
+                    // faster threads (or ones that got a warmer table)
+                    // naturally pick up more work, with no static
+                    // per-thread partition to go uneven.
+                    let i = next_index.fetch_add(1, Ordering::Relaxed);
+                    if i >= to_solve.len() {
+                        break;
+                    }
+                    let key = to_solve[i];
+                    let entry = canonical
+                        .get(&key)
+                        .expect("to_solve only ever contains keys present in canonical");
+                    let score = solver.solve(&entry.pos);
+                    let score_i8 = i8::try_from(score).unwrap_or_else(|_| {
+                        panic!("score {score} for key {key:#x} does not fit in i8")
+                    });
+
+                    // Small, deliberate critical section: guards the tiny
+                    // I/O + hashmap-insert + progress check, never the
+                    // solving itself (which happened above, unlocked).
+                    let mut st = state.lock().expect("checkpoint/scores mutex poisoned");
+                    st.scores.insert(key, score_i8);
+                    writeln!(st.writer, "{key:016x} {score}")
+                        .expect("failed to append checkpoint line");
+                    st.writer
+                        .flush()
+                        .expect("failed to flush checkpoint (resumability depends on this)");
+                    st.done += 1;
+                    let done = st.done;
+                    let time_for_progress = st.last_progress.elapsed() >= Duration::from_secs(60);
+                    if done.is_multiple_of(progress_interval) || done == total_to_solve || time_for_progress {
+                        log_progress(done, total_to_solve, canonical_total, solve_start.elapsed());
+                        st.last_progress = Instant::now();
+                    }
+                }
+            });
+        }
+    });
+
+    state
+        .into_inner()
+        .expect("checkpoint/scores mutex poisoned")
+        .scores
+}
+
 // ---------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------
@@ -198,6 +368,9 @@ struct Args {
     verify_sample: usize,
     seed: u64,
     resume: bool,
+    threads: usize,
+    max_positions: Option<usize>,
+    sample_out: PathBuf,
 }
 
 impl Args {
@@ -208,6 +381,9 @@ impl Args {
         let mut verify_sample = 1000usize;
         let mut seed = 0u64;
         let mut resume = false;
+        let mut threads = default_threads();
+        let mut max_positions = None;
+        let mut sample_out = default_sample_path();
 
         while let Some(arg) = it.next() {
             match arg.as_str() {
@@ -221,19 +397,51 @@ impl Args {
                 }
                 "--seed" => seed = expect_value(&mut it, "--seed").parse().expect("--seed must be an unsigned integer"),
                 "--resume" => resume = true,
+                "--threads" => {
+                    threads = expect_value(&mut it, "--threads")
+                        .parse()
+                        .expect("--threads must be a positive integer")
+                }
+                "--max-positions" => {
+                    max_positions = Some(
+                        expect_value(&mut it, "--max-positions")
+                            .parse()
+                            .expect("--max-positions must be a non-negative integer"),
+                    )
+                }
+                "--sample-out" => sample_out = PathBuf::from(expect_value(&mut it, "--sample-out")),
                 other => panic!(
                     "unrecognised argument {other:?}; expected one of \
-                     --depth --out --tt-mb --verify-sample --seed --resume"
+                     --depth --out --tt-mb --verify-sample --seed --resume \
+                     --threads --max-positions --sample-out"
                 ),
             }
         }
 
-        Args { depth, out, tt_mb, verify_sample, seed, resume }
+        Args {
+            depth,
+            out,
+            tt_mb,
+            verify_sample,
+            seed,
+            resume,
+            threads,
+            max_positions,
+            sample_out,
+        }
     }
 }
 
 fn expect_value<I: Iterator<Item = String>>(it: &mut I, flag: &str) -> String {
     it.next().unwrap_or_else(|| panic!("{flag} requires a value"))
+}
+
+/// Default worker thread count: every logical core the OS reports, or `1`
+/// if that can't be determined (e.g. a sandboxed environment) -- never `0`.
+fn default_threads() -> usize {
+    std::thread::available_parallelism()
+        .map(std::num::NonZeroUsize::get)
+        .unwrap_or(1)
 }
 
 /// `engine/tests/fixtures/book_sample_v1.json`, resolved via
@@ -1146,13 +1354,17 @@ mod tests {
         assert_eq!(args.verify_sample, 1000);
         assert_eq!(args.seed, 0);
         assert!(!args.resume);
+        assert!(args.threads >= 1, "thread count must never default to 0");
+        assert_eq!(args.max_positions, None, "unlimited by default");
+        assert_eq!(args.sample_out, default_sample_path());
     }
 
     #[test]
     fn args_parse_overrides_every_flag() {
         let raw = [
             "--depth", "4", "--out", "/tmp/x.bin", "--tt-mb", "256", "--verify-sample", "200",
-            "--seed", "42", "--resume",
+            "--seed", "42", "--resume", "--threads", "3", "--max-positions", "50",
+            "--sample-out", "/tmp/sample.json",
         ];
         let args = Args::parse(raw.into_iter().map(String::from));
         assert_eq!(args.depth, 4);
@@ -1161,6 +1373,36 @@ mod tests {
         assert_eq!(args.verify_sample, 200);
         assert_eq!(args.seed, 42);
         assert!(args.resume);
+        assert_eq!(args.threads, 3);
+        assert_eq!(args.max_positions, Some(50));
+        assert_eq!(args.sample_out, PathBuf::from("/tmp/sample.json"));
+    }
+
+    #[test]
+    fn default_threads_is_never_zero() {
+        assert!(default_threads() >= 1);
+    }
+
+    // -------------------------------------------------------------
+    // apply_max_positions
+    // -------------------------------------------------------------
+
+    #[test]
+    fn apply_max_positions_none_is_unlimited() {
+        let order = vec![5u64, 3, 9, 1];
+        assert_eq!(apply_max_positions(order.clone(), None), order);
+    }
+
+    #[test]
+    fn apply_max_positions_takes_a_fixed_prefix() {
+        let order = vec![5u64, 3, 9, 1, 7];
+        assert_eq!(apply_max_positions(order, Some(2)), vec![5u64, 3]);
+    }
+
+    #[test]
+    fn apply_max_positions_clamps_when_n_exceeds_the_order_length() {
+        let order = vec![5u64, 3];
+        assert_eq!(apply_max_positions(order.clone(), Some(500)), order);
     }
 
     // -------------------------------------------------------------
@@ -1230,5 +1472,261 @@ mod tests {
         }
 
         let _ = fs::remove_file(&path);
+    }
+
+    // -------------------------------------------------------------
+    // Parallel solve loop (Wave 7.1): determinism, real known-score
+    // correctness, and checkpoint line-atomicity under genuine
+    // multi-threaded contention.
+    //
+    // Uses real Pons End-Easy fixture positions (<=8 empty cells, so each
+    // solve is genuinely fast even in debug) as a synthetic `canonical` map
+    // built directly -- deliberately NOT via `enumerate()` from the empty
+    // board, for the same cost reason `end_to_end_pipeline_...` above
+    // documents. This both keeps the test fast AND lets it assert against
+    // scores the Pons fixture file already asserts independently, so it is
+    // checking `solve_parallel` against known ground truth, not merely
+    // against itself.
+    // -------------------------------------------------------------
+
+    /// Loads `n` fixture lines from `test_l3_r1.txt` (Pons End-Easy) as a
+    /// synthetic `(canonical map, deterministic key order, expected i32
+    /// scores)` triple -- independent of `enumerate`/`canonicalize`'s own
+    /// production path.
+    fn synthetic_canonical_from_fixtures(
+        n: usize,
+    ) -> (HashMap<u64, CanonicalEntry>, Vec<u64>, HashMap<u64, i32>) {
+        let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/test_l3_r1.txt");
+        let contents = fs::read_to_string(&fixture_path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", fixture_path.display()));
+
+        let mut canonical: HashMap<u64, CanonicalEntry> = HashMap::new();
+        let mut expected: HashMap<u64, i32> = HashMap::new();
+        for line in contents.lines().take(n) {
+            let mut parts = line.split_whitespace();
+            let moves = parts.next().expect("fixture line has a move sequence");
+            let expected_score: i32 = parts
+                .next()
+                .expect("fixture line has an expected score")
+                .parse()
+                .expect("fixture score is an integer");
+            let pos = Position::from_moves(moves).expect("fixture move sequence is legal");
+            let key = canonical_key(pos.key());
+            // Fixture lines are independent positions deep enough into
+            // distinct games that a canonical-key collision across them is
+            // not a realistic concern -- assert it loudly if ever wrong
+            // rather than silently dropping a line.
+            assert!(
+                canonical
+                    .insert(
+                        key,
+                        CanonicalEntry { pos, seq: moves.to_string(), ply: pos.moves() as u8 }
+                    )
+                    .is_none(),
+                "unexpected canonical-key collision among fixture lines at {moves:?}"
+            );
+            expected.insert(key, expected_score);
+        }
+
+        let mut order: Vec<u64> = canonical.keys().copied().collect();
+        order.sort_unstable(); // deterministic order, independent of HashMap iteration
+        (canonical, order, expected)
+    }
+
+    /// Strictly parses one checkpoint line as `solve_parallel` writes it
+    /// (`{key:016x} {score}`), panicking (failing the test) on anything
+    /// that doesn't match exactly -- this is what would catch a torn or
+    /// interleaved line if the checkpoint writer's mutex were ever removed
+    /// or narrowed to not cover the whole write+flush.
+    fn parse_checkpoint_line_strict(line: &str) -> (u64, i32) {
+        let mut parts = line.split(' ');
+        let key_hex = parts.next().unwrap_or_else(|| panic!("empty checkpoint line"));
+        let score_str = parts
+            .next()
+            .unwrap_or_else(|| panic!("checkpoint line {line:?} missing a score field"));
+        assert!(
+            parts.next().is_none(),
+            "checkpoint line {line:?} has extra fields -- possible torn/interleaved write"
+        );
+        assert_eq!(
+            key_hex.len(),
+            16,
+            "checkpoint line {line:?}'s key field is not exactly 16 hex characters -- \
+             possible torn/interleaved write"
+        );
+        let key = u64::from_str_radix(key_hex, 16)
+            .unwrap_or_else(|e| panic!("checkpoint line {line:?} has an invalid hex key: {e}"));
+        let score: i32 = score_str
+            .parse()
+            .unwrap_or_else(|e| panic!("checkpoint line {line:?} has an invalid score: {e}"));
+        (key, score)
+    }
+
+    #[test]
+    fn parallel_solve_matches_known_fixture_scores_and_is_deterministic_across_thread_counts() {
+        let (canonical, order, expected) = synthetic_canonical_from_fixtures(40);
+        assert_eq!(order.len(), 40, "sanity: the fixture file has at least 40 lines");
+
+        let dir = std::env::temp_dir();
+        let serial_ckpt = dir.join(format!("gen_book_test_{}_parallel_serial.ckpt", std::process::id()));
+        let parallel_ckpt = dir.join(format!("gen_book_test_{}_parallel_8t.ckpt", std::process::id()));
+        let _ = fs::remove_file(&serial_ckpt);
+        let _ = fs::remove_file(&parallel_ckpt);
+
+        let serial_scores = solve_parallel(
+            &canonical,
+            &order,
+            1, // tt_mb: kept tiny, this is a correctness test not a perf one
+            1, // threads
+            HashMap::new(),
+            &serial_ckpt,
+            canonical.len(),
+        );
+        let parallel_scores = solve_parallel(
+            &canonical,
+            &order,
+            1,
+            8, // threads: real contention on the same shared table
+            HashMap::new(),
+            &parallel_ckpt,
+            canonical.len(),
+        );
+
+        // 1. Both runs solved exactly the fixed key set, nothing more,
+        //    nothing less -- this is what would catch "break the fixed-set
+        //    assignment" (e.g. a bug where thread count changed which keys
+        //    got solved).
+        let order_set: HashSet<u64> = order.iter().copied().collect();
+        assert_eq!(serial_scores.keys().copied().collect::<HashSet<_>>(), order_set);
+        assert_eq!(parallel_scores.keys().copied().collect::<HashSet<_>>(), order_set);
+
+        // 2. Every score matches the independently-known-correct Pons
+        //    fixture value, for BOTH thread counts -- not just "the two
+        //    runs agree with each other" (which alone wouldn't catch two
+        //    runs being consistently wrong the same way).
+        for &key in &order {
+            let want = expected[&key];
+            assert_eq!(
+                serial_scores[&key] as i32, want,
+                "serial (threads=1) score for key {key:#x} disagrees with the Pons fixture"
+            );
+            assert_eq!(
+                parallel_scores[&key] as i32, want,
+                "parallel (threads=8) score for key {key:#x} disagrees with the Pons fixture"
+            );
+        }
+
+        // 3. Byte-for-byte determinism claim, stated directly: identical
+        //    maps regardless of thread count.
+        assert_eq!(
+            serial_scores, parallel_scores,
+            "solve_parallel must return identical scores regardless of thread count"
+        );
+
+        // 4. Checkpoint line-atomicity: every line in both files parses
+        //    strictly, covers exactly the expected key set once each, with
+        //    no torn/interleaved/duplicate lines -- the parallel file is
+        //    the meaningful case (real contention from 8 threads sharing
+        //    one writer), the serial file is the control.
+        for (path, label) in [(&serial_ckpt, "serial"), (&parallel_ckpt, "parallel")] {
+            let contents = fs::read_to_string(path).unwrap_or_else(|e| panic!("{label}: {e}"));
+            let lines: Vec<&str> = contents.lines().collect();
+            assert_eq!(
+                lines.len(),
+                order.len(),
+                "{label}: expected exactly {} checkpoint lines, got {}",
+                order.len(),
+                lines.len()
+            );
+            let mut seen_keys: HashSet<u64> = HashSet::new();
+            for line in &lines {
+                let (key, score) = parse_checkpoint_line_strict(line);
+                assert!(
+                    order_set.contains(&key),
+                    "{label}: checkpoint line for key {key:#x} is not in the expected key set"
+                );
+                assert!(
+                    seen_keys.insert(key),
+                    "{label}: key {key:#x} appears more than once in the checkpoint -- \
+                     a torn write could plausibly manifest as a duplicate/garbled key"
+                );
+                assert_eq!(
+                    score, expected[&key],
+                    "{label}: checkpoint line for key {key:#x} has the wrong score"
+                );
+            }
+            assert_eq!(seen_keys, order_set, "{label}: checkpoint does not cover every expected key exactly once");
+        }
+
+        let _ = fs::remove_file(&serial_ckpt);
+        let _ = fs::remove_file(&parallel_ckpt);
+    }
+
+    #[test]
+    fn parallel_solve_with_max_positions_style_truncation_is_thread_count_independent() {
+        // Exercises `apply_max_positions` feeding into `solve_parallel`
+        // exactly as `main()` wires them: the same fixed prefix, solved
+        // under two different thread counts, must yield the identical
+        // (smaller) result.
+        let (canonical, full_order, expected) = synthetic_canonical_from_fixtures(40);
+        let truncated = apply_max_positions(full_order, Some(15));
+        assert_eq!(truncated.len(), 15);
+
+        let dir = std::env::temp_dir();
+        let ckpt_a = dir.join(format!("gen_book_test_{}_maxpos_1t.ckpt", std::process::id()));
+        let ckpt_b = dir.join(format!("gen_book_test_{}_maxpos_5t.ckpt", std::process::id()));
+        let _ = fs::remove_file(&ckpt_a);
+        let _ = fs::remove_file(&ckpt_b);
+
+        let scores_a = solve_parallel(&canonical, &truncated, 1, 1, HashMap::new(), &ckpt_a, canonical.len());
+        let scores_b = solve_parallel(&canonical, &truncated, 1, 5, HashMap::new(), &ckpt_b, canonical.len());
+
+        assert_eq!(scores_a.len(), 15);
+        assert_eq!(scores_a, scores_b);
+        for (&key, &score) in &scores_a {
+            assert_eq!(score as i32, expected[&key]);
+        }
+
+        let _ = fs::remove_file(&ckpt_a);
+        let _ = fs::remove_file(&ckpt_b);
+    }
+
+    #[test]
+    fn solve_parallel_honours_an_already_populated_initial_scores_map() {
+        // Resume semantics: a key already present in `initial_scores` (as
+        // if loaded from a checkpoint) must survive untouched in the
+        // result even though it is absent from `to_solve` -- and the
+        // checkpoint file must NOT gain a duplicate line for it (nothing
+        // was re-solved).
+        let (canonical, order, expected) = synthetic_canonical_from_fixtures(10);
+        let (already_solved_key, to_solve): (u64, Vec<u64>) =
+            (order[0], order[1..].to_vec());
+
+        let mut initial = HashMap::new();
+        initial.insert(already_solved_key, expected[&already_solved_key] as i8);
+
+        let dir = std::env::temp_dir();
+        let ckpt = dir.join(format!("gen_book_test_{}_resume.ckpt", std::process::id()));
+        let _ = fs::remove_file(&ckpt);
+
+        let result = solve_parallel(&canonical, &to_solve, 1, 4, initial, &ckpt, canonical.len());
+
+        assert_eq!(result.len(), order.len());
+        for &key in &order {
+            assert_eq!(result[&key] as i32, expected[&key]);
+        }
+
+        let contents = fs::read_to_string(&ckpt).unwrap();
+        assert_eq!(
+            contents.lines().count(),
+            to_solve.len(),
+            "the pre-checkpointed key must not be re-solved or re-written"
+        );
+        assert!(
+            !contents.contains(&format!("{already_solved_key:016x}")),
+            "the pre-checkpointed key must not appear in this run's checkpoint output"
+        );
+
+        let _ = fs::remove_file(&ckpt);
     }
 }

@@ -25,6 +25,7 @@
 
 use serde::Serialize;
 
+use crate::book::Book;
 use crate::position::{winning_positions, Position, WIDTH};
 use crate::solver::Solver;
 
@@ -91,7 +92,31 @@ pub struct AnalysisResult {
 /// long-lived and reused across calls: its transposition table persists,
 /// which is what makes a later call with a bigger budget cheaper than
 /// starting over (`docs/ENGINE.md`'s TT-lifetime pin).
+///
+/// Equivalent to `analyse_with_book(solver, pos, node_budget, None)` --
+/// kept as its own function, with its own signature UNCHANGED by this
+/// wave, so every pre-existing test in this module keeps compiling and
+/// passing byte-for-byte against the pre-book behaviour.
 pub fn analyse(solver: &mut Solver, pos: &Position, node_budget: u32) -> AnalysisResult {
+    analyse_with_book(solver, pos, node_budget, None)
+}
+
+/// `analyse`, but consulting `book` first for each column's child position
+/// (`docs/ENGINE.md`: "book consulted before search wherever a position is
+/// solved/analysed; on hit, the score is used directly"). A book hit costs
+/// no node budget at all -- it is a direct table lookup, not a search --
+/// so `budget_remaining` is only ever spent on columns the book misses.
+/// `book: None` (absent, or deliberately disabled -- see `lib.rs`'s
+/// permanent book-disabled flag) falls through to exactly the pre-book
+/// `solve_budgeted` path, so this is provably behaviourally identical to
+/// `analyse` in that case -- see this module's
+/// `book_none_matches_the_book_agnostic_analyse_exactly` test.
+pub fn analyse_with_book(
+    solver: &mut Solver,
+    pos: &Position,
+    node_budget: u32,
+    book: Option<&Book>,
+) -> AnalysisResult {
     let call_start_nodes = solver.node_count();
     let mut budget_remaining = node_budget as u64;
 
@@ -104,6 +129,13 @@ pub fn analyse(solver: &mut Solver, pos: &Position, node_budget: u32) -> Analysi
 
         let mut child = *pos;
         child.play(col);
+
+        if let Some(book_score) = book.and_then(|b| b.lookup(&child)) {
+            columns.push(ColumnEval::Score {
+                score: -book_score,
+            });
+            continue;
+        }
 
         let before = solver.node_count();
         let outcome = solver.solve_budgeted(&child, budget_remaining);
@@ -433,5 +465,121 @@ mod tests {
         // `nodes` is deliberately excluded from this comparison -- the
         // second call over a warm TT is expected to spend fewer nodes,
         // not the same number.
+    }
+
+    // -------------------------------------------------------------
+    // Book integration (Wave 8). All additive: none of the tests above
+    // this point are modified.
+    // -------------------------------------------------------------
+
+    /// Minimal, self-contained v1 book byte builder for this module's own
+    /// tests -- independent of `book.rs`'s own `#[cfg(test)]`-private
+    /// builder, and of `tools/gen_book.rs`'s writer.
+    fn build_test_book(depth: u8, entries: &[(u64, i8)]) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(b"FWBK");
+        out.push(1u8); // version
+        out.push(depth);
+        out.extend_from_slice(&(entries.len() as u32).to_le_bytes());
+        for (key, _) in entries {
+            out.extend_from_slice(&key.to_le_bytes());
+        }
+        for (_, score) in entries {
+            out.push(*score as u8);
+        }
+        out
+    }
+
+    /// `book: None` must be behaviourally identical to the pre-book
+    /// `analyse` on sampled positions -- the equivalence
+    /// `docs/ENGINE.md`'s absent/disabled requirement asks for. This
+    /// doesn't just call the same code path (that would be tautological,
+    /// since `analyse` is defined as `analyse_with_book(.., None)`); it
+    /// independently re-asserts field-by-field equality so a future change
+    /// that splits the two code paths would still be caught.
+    #[test]
+    fn book_none_matches_the_book_agnostic_analyse_exactly() {
+        for &moves in END_EASY {
+            let pos = Position::from_moves(moves).unwrap();
+            let mut solver_a = Solver::new();
+            let mut solver_b = Solver::new();
+            let via_analyse = analyse(&mut solver_a, &pos, 1_000_000);
+            let via_with_book_none = analyse_with_book(&mut solver_b, &pos, 1_000_000, None);
+            assert_eq!(via_analyse.columns, via_with_book_none.columns);
+            assert_eq!(via_analyse.best, via_with_book_none.best);
+            assert_eq!(via_analyse.complete, via_with_book_none.complete);
+            assert_eq!(via_analyse.side_to_move, via_with_book_none.side_to_move);
+            assert_eq!(via_analyse.threats, via_with_book_none.threats);
+            assert_eq!(via_analyse.nodes, via_with_book_none.nodes);
+        }
+    }
+
+    /// A book hit must be used DIRECTLY (no search at all -- zero nodes
+    /// spent on that column) and must match the position's true solved
+    /// score, proving the book path is genuinely exercised rather than
+    /// merely not contradicted.
+    #[test]
+    fn a_book_hit_is_used_directly_with_zero_nodes_spent_on_that_column() {
+        let pos = Position::from_moves(END_EASY[0]).unwrap();
+        // Column 3 (0-indexed) is legal from this fixture position (few
+        // cells left, but not full); build a child and get its TRUE score
+        // from the already fixture-proven solver as ground truth.
+        let col = (0..WIDTH).find(|&c| pos.can_play(c)).expect("at least one legal column");
+        let mut child = pos;
+        child.play(col);
+        let true_child_score = crate::solver::solve(&child);
+
+        let canon = crate::book::canonical_key(child.key());
+        // `depth` set past this fixture's own ply (37+) rather than a
+        // realistic book depth of 8: this test's fixture is deliberately
+        // an END_EASY position (few cells left, so the search is cheap
+        // enough to run un-ignored in debug), which is far past any real
+        // book's generated depth -- the `depth` field is only a fast-path
+        // hint (docs/ENGINE.md), so declaring it generously here just
+        // avoids that hint short-circuiting the lookup this test exists
+        // to prove, without weakening what's actually being tested (the
+        // binary search + score-used-directly behaviour).
+        let book_bytes = build_test_book(60, &[(canon, true_child_score as i8)]);
+        let book = Book::load(&book_bytes).unwrap();
+
+        let mut solver = Solver::new();
+        // A budget of 0: if the book is NOT consulted, this column would
+        // have to come back Unknown (or, if it happens to be an immediate
+        // win, still cost the free win-check but never touch the book
+        // path this test is trying to prove) -- a budget this tight only
+        // succeeds if the book hit is what resolved it.
+        let result = analyse_with_book(&mut solver, &pos, 0, Some(&book));
+
+        assert_eq!(
+            result.columns[col as usize],
+            ColumnEval::Score { score: -true_child_score },
+            "a book hit must resolve the column directly under a zero node budget"
+        );
+    }
+
+    /// The "disabled" half of ruling 3's book-absent/disabled distinction
+    /// lives one layer up (`lib.rs` owns the enabled/disabled flag; this
+    /// module only ever sees `Option<&Book>`) -- but the equivalence this
+    /// module is responsible for is that a `Some(&book)` that MISSES for
+    /// every child position behaves identically to `None`, which is what
+    /// "disabled" ultimately reduces to at this layer once `lib.rs`
+    /// resolves the flag to a book reference.
+    #[test]
+    fn a_book_that_misses_every_child_matches_book_none_exactly() {
+        let pos = Position::from_moves(END_EASY[1]).unwrap();
+        // A book with real entries, but for keys that cannot possibly
+        // match any child of this fixture position (chosen far outside
+        // any real Position::key() range reachable from it).
+        let unrelated_bytes = build_test_book(8, &[(999_999_999_998, -5), (999_999_999_999, 5)]);
+        let unrelated_book = Book::load(&unrelated_bytes).unwrap();
+
+        let mut solver_a = Solver::new();
+        let mut solver_b = Solver::new();
+        let with_missing_book = analyse_with_book(&mut solver_a, &pos, 1_000_000, Some(&unrelated_book));
+        let with_none = analyse_with_book(&mut solver_b, &pos, 1_000_000, None);
+
+        assert_eq!(with_missing_book.columns, with_none.columns);
+        assert_eq!(with_missing_book.best, with_none.best);
+        assert_eq!(with_missing_book.complete, with_none.complete);
     }
 }

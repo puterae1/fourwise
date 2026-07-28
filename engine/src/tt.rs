@@ -608,11 +608,33 @@ mod tests {
     /// enough capacity, `partial_key = key / capacity` overflows `u32` and
     /// gets silently truncated by the `as u32` cast, so two DIFFERENT real
     /// ~49-bit keys can alias to the identical `(index, partial_key)` pair
-    /// -- a wrong-score risk, not merely wasted work. This test uses keys
-    /// near the documented ~2^50 bound and a deliberately tiny REQUESTED
-    /// capacity (`10`, far below the floor) to prove the clamp actually
-    /// prevents the aliasing, not just that `capacity()` reports a big
-    /// number.
+    /// -- a wrong-score risk, not merely wasted work.
+    ///
+    /// **Carried-forward nit (Wave 7.1 audit, fixed Wave 8): what actually
+    /// discriminates here.** This test's own round-trip loop does NOT, by
+    /// itself, catch a removed clamp: at the unclamped capacity
+    /// (`smallest_prime_at_least(10)` = 11), each of these four keys still
+    /// round-trips against ITSELF, because `get` and `insert` compute the
+    /// same (truncated, if the clamp were removed) `partial_key` from the
+    /// same key deterministically -- self-consistency survives truncation
+    /// even though the underlying arithmetic has become lossy. Proving the
+    /// clamp specifically requires either (a) two DIFFERENT keys that
+    /// truncate to the same `(index, partial_key)` pair at the unclamped
+    /// capacity (not attempted here, since constructing one deliberately
+    /// is exactly the `k` / `k + capacity` collision form used by
+    /// `shared_table_colliding_key_overwrites_rather_than_panics` above,
+    /// which tests overwrite-on-collision semantics, a different property
+    /// than aliasing prevention), or (b) directly asserting the clamp
+    /// fired. This test does (b) -- the `assert!(tt.capacity() >=
+    /// MIN_SAFE_CAPACITY, ...)` line immediately below is the assertion
+    /// that actually fails if the clamp is removed; the round-trip loop
+    /// that follows is a real, additional sanity check (realistic ~2^50
+    /// keys survive at the CLAMPED capacity, which the doc comment
+    /// originally over-claimed as "proof" on its own) but is not itself
+    /// what catches a missing clamp. `distinct_keys_at_realistic_table_
+    /// size_never_alias` and `shared_table_split_is_lossless_like_the_
+    /// owned_table` are the tests that directly exercise lossless
+    /// round-tripping of realistic keys at full production scale.
     #[test]
     fn shared_table_round_trips_realistic_keys_even_when_constructed_with_a_tiny_requested_capacity() {
         let tt = SharedTranspositionTable::with_capacity(10);

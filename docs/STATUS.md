@@ -122,9 +122,13 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
   frames) — though system memory is tight (~11 GB compressed) and
   worsens as the table fills; watch it. 2.66 vs 0.89 reconciled: both
   honest snapshots of an unaccounted-shared machine, one at nice 0,
-  one at nice 5. **Live-run rescue, owner to run if desired:
-  `renice -n 0 -p 15659` (no kill, no checkpoint impact); bigger
-  lever: close unrelated sessions on this Mac.** Hygiene rule adopted:
+  one at nice 5. **Live-run rescue — EXECUTED by owner 2026-07-28, with a command
+  correction: `renice -n 0 -p <pid>` is a SILENT NO-OP on macOS (`-n`
+  is an increment, not an absolute value — it changed nothing, twice,
+  without error). Correct form: `sudo renice 0 -p <pid>` (no -n;
+  lowering nice needs root). Owner-verified: NI now 0, CPU 381% and
+  climbing. Bigger lever remains closing unrelated sessions on this
+  Mac.** Hygiene rule adopted:
   every wave verifies `pgrep -fl gen_book` shows nothing but
   production before reporting done; never wrap backgrounded probes in
   `/usr/bin/time ... &` ($! tracks the wrapper, orphaning the child).

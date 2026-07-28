@@ -102,8 +102,34 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
 
 ## In flight
 
-- **Wave 7.2 — THROUGHPUT COLLAPSE IN PRODUCTION, delegated 2026-07-28
-  (profile first, fix second).** Owner's live depth-8 run: 141% CPU
+- **Wave 7.2 — DIAGNOSED 2026-07-28, no engine code at fault, zero
+  source changes.** Root causes, measured: (1) PRIMARY — external
+  contention on a heavily shared machine (load avg 17→84 during the
+  investigation; 9 terminal sessions), including TWO LEAKED gen_book
+  strays — one orphaned by the 7.2 probe's own /usr/bin/time-wrapper
+  PID bug, one left running since Wave 7.1's in-session rehearsal.
+  Killing just those two strays jumped production from ~250-580% to
+  844% CPU within one poll, production untouched — direct proof the
+  degradation was contention, and that 7.1's "contended" probe context
+  was itself unaccounted-for. (2) SECONDARY — zsh's default BGNICE
+  silently niced the launch script's `&`-backgrounded job to +5
+  (reproduced byte-for-byte; production runs at nice 5); harmless idle,
+  loses arbitration under load. FIXED in ~/fourwise-launch.sh
+  (`unsetopt bgnice`). RULED OUT by evidence: mutex/handout
+  serialisation (5-s stack sample, 2802 frames/thread, all 10 workers
+  in negamax, zero lock-wait), hard E-core QoS clamp (844% > the 600%
+  E-core ceiling), direct 8 GB-table stalls (RSS 5.6 GB, no fault
+  frames) — though system memory is tight (~11 GB compressed) and
+  worsens as the table fills; watch it. 2.66 vs 0.89 reconciled: both
+  honest snapshots of an unaccounted-shared machine, one at nice 0,
+  one at nice 5. **Live-run rescue, owner to run if desired:
+  `renice -n 0 -p 15659` (no kill, no checkpoint impact); bigger
+  lever: close unrelated sessions on this Mac.** Hygiene rule adopted:
+  every wave verifies `pgrep -fl gen_book` shows nothing but
+  production before reporting done; never wrap backgrounded probes in
+  `/usr/bin/time ... &` ($! tracks the wrapper, orphaning the child).
+  Suites re-confirmed clean post-investigation.
+  Original symptom record: Owner's live depth-8 run: 141% CPU
   with 11 threads (~1.4 of 10 cores), 0.89 pos/s DECLINING on the
   cheapest tier, ETA 40h+. Does not reconcile with 7.1's 2.66/s
   "contended" probe — production is slower UNcontended. Hypotheses

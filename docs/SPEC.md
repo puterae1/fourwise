@@ -189,6 +189,18 @@ per-column analysis reports the game's outcome ("game over — you won" /
 observed live the rail showed "Still solving this column" seven times under
 a "You win." headline. Terminal display beats analysis display.
 
+**Scope clarification (amended 2026-07-29, owner-ruled).** The
+terminal-beats-analysis rule above covers EVERY analysis-derived surface,
+not only the per-column panel and rail. Any UI element whose content is
+derived from position analysis — parity ruler, verdict strips, badges,
+captions, or any surface added later — must either hide or display the
+game's outcome when the position is terminal. Rationale on the record:
+the rule was first fixed only where the defect was observed (the column
+panel), and the identical defect then recurred in the parity ruler — a
+component-scoped fix to a class-wide rule. A new analysis-derived surface
+that survives a terminal position unchanged is a §3.2 violation by
+definition, not a new discovery.
+
 **Blunder flag:** after each human move, compare the evaluation before and after. If
 the verdict degrades (win → draw, draw → loss, win → loss), surface it immediately
 with the move that should have been played. This is the feature that actually

@@ -133,19 +133,29 @@ Phase 2 delegation happens until the breakdown is approved and recorded here.
   canonicalisation / depth off-by-one all caught by named tests).
   NOT yet produced (sanctioned): book_d4.bin, book_sample_v1.json — both
   are written only at run completion, which happens detached.
-- **Depth-8 production run: OWNER runs it from a plain shell** (per
-  ruling 1 — never inside a Claude Code session). Command on record:
-  ```
-  cd ~/Projects/fourwise/engine && \
-  cp /tmp/book_d4.bin.checkpoint ../web/public/book.bin.checkpoint 2>/dev/null; \
-  nohup caffeinate -i cargo run --release --bin gen_book -- \
-    --depth 8 --tt-mb 8192 --verify-sample 1000 --seed 42 \
-    --out ../web/public/book.bin --resume \
-    > ~/fourwise-genbook-d8.log 2>&1 &
-  ```
-  (`caffeinate -i` prevents idle sleep only — plug in and keep the lid
-  open, or set Energy Saver to never sleep. A sleep stalls, never kills;
-  re-running the identical command resumes from the checkpoint.)
+- **PROBE RESULTS 2026-07-28 (5-min depth-8 probe + kill-9/resume probe,
+  scratch path, production settings):** resume VERIFIED live — restart
+  reported "76 already checkpointed, 129422 left", first 76 checkpoint
+  lines byte-identical across the kill, zero duplicate keys. Checkpoint
+  interval: every position, flushed. Depth-8 totals from the real run:
+  129,498 canonical positions (258,614 raw). **Measured cold solve rate:
+  ~0.25–0.4 positions/s → 4–6 DAYS single-threaded if the rate holds.**
+  TT warming will improve it by an unknown factor, but "overnight" was
+  never realistic as built. Also: progress lines are count-based
+  (total/100 ≈ every 1,295 positions ≈ >1 h between lines at this rate)
+  — no early ETA visible in the log. Owner decision pending on the fix
+  (parallelise the solve loop / longer probe to measure TT-warming /
+  reduce depth). DO NOT launch the production run until ruled.
+- **Depth-8 production run: OWNER runs `~/fourwise-launch.sh` from a
+  plain Terminal** (per ruling 1 — never inside a Claude Code session).
+  The script replaces the earlier inline command (which had a re-run
+  hazard: its unconditional checkpoint `cp` would clobber accumulated
+  progress on a second launch — the script guards this). It seeds the
+  checkpoint from /tmp (789 solved positions: 676 d4-rehearsal + probe
+  solves, merged 2026-07-28), launches under `nohup caffeinate -i`,
+  logs to `~/fourwise-genbook-d8.log`, and is safe to re-run after any
+  interruption. **HOLD: do not launch until the throughput decision
+  above is ruled — as built the run is 4–6 days single-threaded.**
   Progress: `grep gen_book ~/fourwise-genbook-d8.log | tail`. Kill-safe;
   re-run the same command to resume after any interruption. Writes the
   book atomically and `engine/tests/fixtures/book_sample_v1.json`

@@ -171,12 +171,75 @@
   artifact — human move played, engine replied with the honest partial
   badge, role-based control defaults live.
 
-## In flight
+## PHASE 1 GATE RECORD (assembled 2026-07-28, owner sign-off pending)
 
-- **Phase 1 gate audit** (`verifier`): four of five criteria with evidence;
-  criterion 1's primary evidence is the full release-fixture run executing
-  on CI (bare checkout, deployed commit); criterion 3's on-device half
-  HELD for owner phone evidence per instruction.
+**Criterion 1 — every reference fixture returns its exact score: MET, on
+native evidence, bridged — not re-measured — in wasm.** Evidence: the
+completed local release run — all six Pons sets, 6,000/6,000 exact,
+1,949 s, log preserved — verifier-audited in Wave 2 (four sets re-run
+directly, two via the completed-run log); `engine/` byte-identical to that
+verified state in every subsequent audit (git-diff-confirmed repeatedly);
+debug suites + clippy green locally and on CI from a bare checkout.
+**Stated plainly: this is a NATIVE binary measurement. The shipped
+artifact is wasm compiled from the same source, and no 6,000-position run
+has ever been executed in the wasm build.** What bridges the gap:
+(a) the wasm surface is a thin wrapper over the identical solver source
+with no conditional compilation of search logic; (b) Wave 3's
+cross-environment check — one endgame position returning identical
+best/scores/threats in native Rust, Node-loaded wasm, and a real Chrome
+Web Worker; (c) live-deployed and on-device play behaving correctly.
+That bridge is consistency sampling, not exhaustive re-verification.
+CI evidence (verifier read the cancelled run's full log, not just its
+status): before the 90-min timeout killed it, the bare-checkout runner
+had confirmed on CURRENT code — 28/28 lib tests incl. the full
+empty-board solve (365 s), 20/20 position tests, mirror + negamax
+self-consistency, and FIVE of six fixture sets exact (5,000/6,000
+positions: L3_R1, L2_R1, L2_R2, L1_R1, L1_R2). Zero failures anywhere;
+Begin-Hard was mid-flight when cancelled. Precise residual: L1_R3's
+1,000 positions are confirmed exact only on the Wave 2 build; on current
+code they rest on position.rs/tt.rs being byte-identical since, plus the
+verifier's full read of solver.rs's Wave 3 diff (budget wrapper provably
+a no-op on the unbudgeted path every fixture uses) — inference, not
+execution. A 240-min re-dispatch (run 30334738699) is executing; its
+result is appended here when it lands, closing criterion 1's letter.
+
+**Criterion 2 — four-seat combination test as amended (SPEC §1): MET.**
+`seat.test.ts`: fixed literal engine input including a whole
+AnalysisResult, four seats, hand-written per-seat expectations,
+cross-grouped independence proofs (verdicts split A+D/B+C while colour
+splits A+B/C+D), byte-identical engine inputs asserted against the
+production call site (rebuilt after the verifier killed the decoy
+stand-in). Verifier-confirmed in three separate audits. Live: owner's
+on-device check #5 — wording flips correctly across all four seats.
+
+**Criterion 3 — mid-game responsiveness as pinned: MET.** Definition
+pinned in ROADMAP before any measurement existed. Desk half: worst case
+39.1 ms across plies 15–25, with the committed throttle-probe honestly
+establishing that CDP throttling does not constrain Workers (weakness on
+the record). Deciding half: owner evidence, iPhone, Safari then Chrome —
+ply-12+ analysis settles under a second on-device.
+
+**Criterion 4 — keyboard-navigable, reduced-motion, one-handed portrait:
+MET.** Wave 6a bullet-by-bullet audit with fixes (keyboard guard bug
+found, fixed, regression-tested; 44 px targets; reduced-motion
+hard-disable verified via emulated media; grayscale distinguishability;
+no horizontal scroll 360–430 px), verifier PASS; owner on-device check
+#3 — one-handed portrait usable, columns 1 and 7 reachable.
+
+**Criterion 5 — deployed and loading from the GitHub Pages URL: MET.**
+Full asset chain curled cold/no-cache (all classes 200, wasm served
+`application/wasm`, /fourwise/ prefix load-bearing); first-ever-visit
+cold load renders; end-to-end play on the deployed artifact (engine
+reply, honest partial badge); owner: cold open clean on both mobile
+browsers, and airplane-mode reload works offline.
+
+**Known defects logged, owner-classified as post-gate (Phase 2):** engine
+partial-play tactics at "Perfect" (SPEC §3.1 amended to
+complete-shallow-at-cap), level-label honesty (§3.1), terminal-display
+(§3.2).
+
+**Orchestrator judgement: all five criteria MET. Gate recommendation:
+PASS.** Awaiting owner signature; Phase 2 does not begin until given.
 - **On-device evidence IN (owner, 2026-07-28, iPhone — Safari then
   Chrome, both clean): all six checks pass on the live URL.** Cold open →
   live board with engine move; ply-12+ analysis settles under a second

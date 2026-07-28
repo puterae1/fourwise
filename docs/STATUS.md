@@ -154,10 +154,21 @@
   the record (headless Opus, verified). Every remaining candidate in the
   sweep table is inert or correct. **There is no known occurrence four.**
 
+- **Wave 6b — CI/deploy workflows: COMPLETE 2026-07-28.** ci.yml green on
+  its first live run (both jobs, bare-checkout proof of the pkg rebuild —
+  wasm-pack's own .gitignore meant pkg was never committed; fresh clones
+  could not build until this fix). deploy.yml dispatch-only until Pages
+  exists; engine-release-fixtures.yml on demand. /fourwise/ base proven
+  under a local prefix server (all asset classes 200 with the prefix, 404
+  without).
+
 ## In flight
 
-Next: **Wave 6b — deploy** (Actions workflow; repo-public review awaits
-owner sign-off on the inventory).
+Awaiting owner: (1) repo-public flip + Pages enablement (inventory
+reviewed: .claude/, ORCHESTRATION quota strategy, STATUS decision history,
+CAMERA.md, OPPONENT-MODEL.md; history scan clean; author email visible),
+then first deploy dispatch; (2) 6c on-device evidence (phone, incl.
+mobile Safari) against the live URL; then the full gate audit.
 
 ## Ownership
 

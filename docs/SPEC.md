@@ -201,6 +201,16 @@ component-scoped fix to a class-wide rule. A new analysis-derived surface
 that survives a terminal position unchanged is a §3.2 violation by
 definition, not a new discovery.
 
+Scope precision (2026-07-29, from the Wave 10.1 sweep): the rule covers
+surfaces making PRESENT-TENSE claims about the current position's
+analysis. Backward-looking provenance records — the move list's
+"chosen from an incomplete analysis" badge, the level qualifier's
+"last move was..." text — describe a specific past move, remain true
+regardless of how the game later ended, and are exempt. The test: if
+the surface's sentence would become false or nonsensical the moment
+the game ends, it must hide or show the outcome; if it states a fact
+about a past ply, it stands.
+
 **Blunder flag:** after each human move, compare the evaluation before and after. If
 the verdict degrades (win → draw, draw → loss, win → loss), surface it immediately
 with the move that should have been played. This is the feature that actually

@@ -1,0 +1,105 @@
+.save-reconstructed-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: 0 var(--gutter) var(--sp-2);
+}
+
+.save-reconstructed-panel__notice {
+  margin: 0;
+  font-family: var(--f-body);
+  font-size: var(--t-body-size);
+  color: var(--c-n-5);
+}
+
+.save-reconstructed-panel__placing {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  background: var(--c-n-0);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3);
+}
+
+.save-reconstructed-panel__placing-label {
+  font-family: var(--f-display);
+  font-weight: var(--w-label);
+  font-size: var(--t-label-size);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-n-7);
+}
+
+.save-reconstructed-panel__label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.save-reconstructed-panel__label-text {
+  font-family: var(--f-body);
+  font-size: var(--t-body-size);
+  color: var(--c-n-5);
+  flex-shrink: 0;
+}
+
+.save-reconstructed-panel__input {
+  flex: 1 1 auto;
+  min-height: 44px;
+  min-width: 0;
+  border: 1px solid var(--c-n-3);
+  border-radius: var(--r-sm);
+  background: var(--c-n-0);
+  padding: 0 var(--sp-2);
+  font-family: var(--f-body);
+  font-size: var(--t-body-size);
+  color: var(--c-n-9);
+}
+
+.save-reconstructed-panel__input:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+.save-reconstructed-panel__actions {
+  display: flex;
+  justify-content: space-around;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.save-reconstructed-panel__action {
+  flex: 1;
+  appearance: none;
+  border: 1px solid var(--c-n-3);
+  background: var(--c-n-0);
+  border-radius: var(--r-md);
+  min-height: 44px;
+  font-family: var(--f-body);
+  font-weight: var(--w-body-strong);
+  font-size: var(--t-body-size);
+  cursor: pointer;
+}
+
+.save-reconstructed-panel__action:disabled {
+  color: var(--c-n-5);
+  cursor: default;
+}
+
+.save-reconstructed-panel__action--primary {
+  background: var(--c-frame);
+  color: var(--c-n-0);
+  border-color: var(--c-frame);
+}
+
+.save-reconstructed-panel__action--primary:disabled {
+  background: var(--c-n-2);
+  color: var(--c-n-5);
+  border-color: var(--c-n-2);
+}
+
+.save-reconstructed-panel__action:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+}

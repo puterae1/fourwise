@@ -83,3 +83,28 @@
   color: var(--c-n-5);
   cursor: default;
 }
+
+/* Wave 12's `Games ▸` door -- design §15.2: the same `--t-micro` `Signal`
+ * text-link treatment as `AnalysePanel.css`'s `.analyse-panel__raw-toggle`,
+ * deliberately NOT styled like `.play-panel__action` (a bordered button):
+ * this is a text control, not a same-weight peer of Undo/Redo. */
+.play-panel__games-door {
+  flex: 0 0 auto;
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--c-signal);
+  font-family: var(--f-body);
+  font-weight: var(--w-body-strong);
+  font-size: var(--t-micro-size);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  min-height: 44px;
+  padding: 0 var(--sp-2);
+}
+
+.play-panel__games-door:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+}

@@ -6,6 +6,11 @@
 // them, since the task requires them and nowhere else in the layout fits.
 // Ordered by ROLE (You, then Opponent) per design §5's seat-neutrality
 // rule, never by colour.
+//
+// Wave 12 (OPPONENT-MODEL.md game log) adds the `Games ▸` door here, exactly
+// where design §15.2 draws it: "`Undo Redo Games ▸` on phone" -- the same
+// `--t-micro` `Signal` text-link treatment as `AnalysePanel.tsx`'s own
+// `raw scores ▸` toggle, appended after Redo.
 
 import type { Colour } from '../game/seat.js';
 import type { Level } from '../game/levels.js';
@@ -52,6 +57,8 @@ export interface PlayPanelProps {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  /** Wave 12: opens the games sheet (design §15.2/§16). */
+  onOpenGames: () => void;
 }
 
 function PlayerRow({
@@ -123,6 +130,7 @@ export function PlayPanel({
   onRedo,
   canUndo,
   canRedo,
+  onOpenGames,
 }: PlayPanelProps) {
   return (
     <div className="play-panel">
@@ -152,6 +160,9 @@ export function PlayPanel({
         </button>
         <button type="button" className="play-panel__action" onClick={onRedo} disabled={!canRedo}>
           Redo
+        </button>
+        <button type="button" className="play-panel__games-door" onClick={onOpenGames}>
+          Games ▸
         </button>
       </div>
     </div>

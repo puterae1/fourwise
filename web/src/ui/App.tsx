@@ -8,6 +8,7 @@ import { useEngineClient } from './useEngineClient.js';
 import { useBookLoad } from './useBookLoad.js';
 import { useGameController, opponentColourOf } from './useGameController.js';
 import { useSetupEditor } from './useSetupEditor.js';
+import { useGameLog } from './useGameLog.js';
 import { SeatControls } from './SeatControls.js';
 import { SeatPrompt } from './SeatPrompt.js';
 import { loadStoredSeat, saveSeat } from './seatStorage.js';
@@ -18,6 +19,9 @@ import { Board } from './Board.js';
 import { PlayPanel } from './PlayPanel.js';
 import { AnalysePanel } from './AnalysePanel.js';
 import { SetupPanel } from './SetupPanel.js';
+import { SaveLiveGameControl } from './SaveLiveGameControl.js';
+import { SaveReconstructedPanel } from './SaveReconstructedPanel.js';
+import { GamesSheet } from './GamesSheet.js';
 import { MoveList } from './MoveList.js';
 import { Rail, isDesktopLayout } from './Rail.js';
 import { isColumnFull } from './deriveBoard.js';
@@ -35,9 +39,11 @@ import {
   type TerminalOutcome,
 } from './copy.js';
 import { userMovesFirst, type Seat } from '../game/seat.js';
-import type { GameState } from '../game/gameState.js';
+import { enginePosition, type GameState } from '../game/gameState.js';
 import { parityRows } from '../game/parity.js';
 import { exportGameState } from '../game/exportFormat.js';
+import { buildLoggedGame, mostRecentOpponentLabel } from '../game/loggedGame.js';
+import { reconstructFinishedGame } from '../game/reconstructedLog.js';
 import type { TranslatedAnalysis } from '../game/verdict.js';
 import './App.css';
 
@@ -128,6 +134,18 @@ function App() {
   const importInputRef = useRef<HTMLInputElement>(null);
   const showRail = isDesktopLayout(viewportWidth);
 
+  // Wave 12 (OPPONENT-MODEL.md game log, DoD items 3/4/6). `gameLog` owns
+  // the whole archive (persisted independently of the current game, `ui/
+  // useGameLog.ts`). `gamesSheetOpen` is the `Games ▸` door's own sheet
+  // (design §16.1). `loggingFromMemory` is set only while "Add a game from
+  // memory" (design §16.4) is in progress -- it repurposes Setup mode's
+  // EXISTING grid-editing machinery (`setup`, below) for a FINISHED game
+  // instead of a continue-play position, so entering it always switches to
+  // `mode === 'setup'` the same way the ModeSwitch tab does.
+  const gameLog = useGameLog();
+  const [gamesSheetOpen, setGamesSheetOpen] = useState(false);
+  const [loggingFromMemory, setLoggingFromMemory] = useState(false);
+
   // Persist the current game (SPEC §5, "current game survives a refresh")
   // on every change -- moves, undo/redo, jump-to-ply, mode switches, and a
   // fresh Setup-derived game all funnel through `controller.game`, so one
@@ -206,7 +224,10 @@ function App() {
   // (CLAUDE.md invariant #3) -- both go through a plain `Blob`/`<a download>`
   // and a hidden `<input type="file">`, entirely client-side.
   function handleExport() {
-    const envelope = exportGameState(controller!.game);
+    // Wave 12: the SAME envelope now also carries the whole game log
+    // (`game/exportFormat.ts`'s v2 `loggedGames`, additive) -- one Export
+    // button, one file, both the current game and the archive.
+    const envelope = exportGameState(controller!.game, new Date().toISOString(), gameLog.games);
     const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -230,6 +251,56 @@ function App() {
     const text = await file.text();
     const result = controller!.importGame(text);
     setImportError(result.ok ? null : result.message);
+    // Wave 12: any logged games the file brought (`[]` for a plain v1 file)
+    // merge into the log, de-duplicated by id -- never touches the ACTIVE
+    // seat/game import path above, which is unchanged.
+    if (result.ok) gameLog.mergeImported(result.loggedGames);
+  }
+
+  // ---- game log (Wave 12) ---------------------------------------------
+  function handleOpenGamesSheet() {
+    setGamesSheetOpen(true);
+  }
+
+  function handleCloseGamesSheet() {
+    setGamesSheetOpen(false);
+  }
+
+  // design §16.4: reuses Setup's existing grid-editing machinery wholesale
+  // -- entering this flow is just switching to Setup mode with a flag set,
+  // never a second board/editor implementation.
+  function handleAddFromMemory() {
+    setGamesSheetOpen(false);
+    setLoggingFromMemory(true);
+    controller!.setMode('setup');
+  }
+
+  function handleCancelAddFromMemory() {
+    setLoggingFromMemory(false);
+    controller!.setMode('play');
+  }
+
+  function handleSaveReconstructed(opponent: string) {
+    const outcome = reconstructFinishedGame(controller!.seat, setup.grid);
+    if (!outcome.ok) return; // Save is disabled in the UI unless this is ok
+    const game = buildLoggedGame({
+      seat: controller!.seat,
+      moves: outcome.moves,
+      winner: outcome.winner,
+      opponent,
+      source: 'reconstructed',
+    });
+    gameLog.addGame(game);
+    setLoggingFromMemory(false);
+    controller!.setMode('play');
+  }
+
+  function handleSaveLiveGame(opponent: string) {
+    const winner = controller!.board.winLine?.colour ?? null;
+    const position = enginePosition(controller!.game);
+    const moves = position.split('').map((digit) => Number(digit) - 1);
+    const game = buildLoggedGame({ seat: controller!.seat, moves, winner, opponent, source: 'live' });
+    gameLog.addGame(game);
   }
 
   // ---- headline slot ------------------------------------------------
@@ -243,8 +314,24 @@ function App() {
   // that has nothing left to mean once the game has actually ended.
   let terminal: TerminalOutcome | null = null;
 
+  // Wave 12: while "adding a game from memory" (design §16.4), Setup's own
+  // `validateSetup`/`setup.rejection` is the WRONG check -- it rejects any
+  // completed four-in-a-row, which a finished game necessarily has. This
+  // reuses the same checks 1-3 (`reconstructFinishedGame`, `game/
+  // reconstructedLog.ts`) and only requires the board to actually be over.
+  const reconstructOutcome = controller.mode === 'setup' && loggingFromMemory
+    ? reconstructFinishedGame(controller.seat, setup.grid)
+    : null;
+
   if (controller.mode === 'setup') {
-    if (setup.rejection) {
+    if (loggingFromMemory) {
+      if (reconstructOutcome && !reconstructOutcome.ok) {
+        variant = 'error';
+        sentence = reconstructOutcome.rejection.message;
+      } else {
+        sentence = 'Set up the finished position, then save it.';
+      }
+    } else if (setup.rejection) {
       variant = 'error';
       sentence = setup.rejection.message;
     } else {
@@ -373,19 +460,34 @@ function App() {
 
           <div className="page__action-slot">
             {controller.mode === 'play' && (
-              <PlayPanel
-                userColour={controller.seat.userColour}
-                opponentColour={opponentColour}
-                controls={controller.controls}
-                onControlChange={controller.setControl}
-                levels={controller.levels}
-                onLevelChange={controller.setLevel}
-                levelQualifiers={controller.levelQualifiers}
-                onUndo={controller.undo}
-                onRedo={controller.redo}
-                canUndo={controller.canUndo}
-                canRedo={controller.canRedo}
-              />
+              <>
+                <PlayPanel
+                  userColour={controller.seat.userColour}
+                  opponentColour={opponentColour}
+                  controls={controller.controls}
+                  onControlChange={controller.setControl}
+                  levels={controller.levels}
+                  onLevelChange={controller.setLevel}
+                  levelQualifiers={controller.levelQualifiers}
+                  onUndo={controller.undo}
+                  onRedo={controller.redo}
+                  canUndo={controller.canUndo}
+                  canRedo={controller.canRedo}
+                  onOpenGames={handleOpenGamesSheet}
+                />
+                {controller.board.isGameOver && (
+                  // Wave 12, DoD item 3: "record from live play". Keyed by
+                  // the finished position so a NEW finished game (after an
+                  // undo past it and a different ending) gets a fresh,
+                  // unsaved control rather than inheriting a stale "Saved."
+                  // confirmation from a previous one.
+                  <SaveLiveGameControl
+                    key={enginePosition(controller.game)}
+                    defaultOpponent={mostRecentOpponentLabel(gameLog.games)}
+                    onSave={handleSaveLiveGame}
+                  />
+                )}
+              </>
             )}
             {controller.mode === 'analyse' && (
               <AnalysePanel
@@ -400,17 +502,30 @@ function App() {
                 terminal={terminal}
               />
             )}
-            {controller.mode === 'setup' && (
-              <SetupPanel
-                placing={setup.placing}
-                onPlacingChange={setup.setPlacing}
-                onUndo={setup.undo}
-                onClear={setup.clear}
-                onDone={() => controller.commitSetup(setup.grid, 'play')}
-                canUndo={setup.canUndo}
-                canDone={setup.rejection === null}
-              />
-            )}
+            {controller.mode === 'setup' &&
+              (loggingFromMemory ? (
+                <SaveReconstructedPanel
+                  placing={setup.placing}
+                  onPlacingChange={setup.setPlacing}
+                  onUndo={setup.undo}
+                  onClear={setup.clear}
+                  onCancel={handleCancelAddFromMemory}
+                  onSave={handleSaveReconstructed}
+                  canUndo={setup.canUndo}
+                  canSave={reconstructOutcome?.ok ?? false}
+                  defaultOpponent={mostRecentOpponentLabel(gameLog.games)}
+                />
+              ) : (
+                <SetupPanel
+                  placing={setup.placing}
+                  onPlacingChange={setup.setPlacing}
+                  onUndo={setup.undo}
+                  onClear={setup.clear}
+                  onDone={() => controller.commitSetup(setup.grid, 'play')}
+                  canUndo={setup.canUndo}
+                  canDone={setup.rejection === null}
+                />
+              ))}
           </div>
 
           <ModeSwitch mode={controller.mode} onChange={controller.setMode} />
@@ -438,6 +553,15 @@ function App() {
           controller.jumpToPly(ply);
           setMoveListOpen(false);
         }}
+      />
+
+      <GamesSheet
+        open={gamesSheetOpen}
+        onClose={handleCloseGamesSheet}
+        games={gameLog.games}
+        onAddFromMemory={handleAddFromMemory}
+        onExport={handleExport}
+        onImport={handleImportClick}
       />
     </div>
   );

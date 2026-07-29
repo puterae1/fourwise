@@ -27,6 +27,7 @@ import {
   type Mode,
 } from '../game/gameState.js';
 import { parseImportFile, toGameState } from '../game/exportFormat.js';
+import type { LoggedGame } from '../game/loggedGame.js';
 import { colourAtPly, otherColour, type Colour, type Seat } from '../game/seat.js';
 import type { Grid } from '../game/setup.js';
 import { translateAnalysis, translateScore, type TranslatedAnalysis, type VerdictKind } from '../game/verdict.js';
@@ -137,8 +138,15 @@ export interface GameController {
    * NOT touch the separately-persisted `fourwise:seat` preference, which
    * `App.tsx` only ever writes from the first-run prompt now. Never throws;
    * a failure returns the exact honest message `exportFormat.ts` produced,
-   * one of the three distinct failure modes (SPEC §5 amendment). */
-  importGame: (fileText: string) => { ok: true } | { ok: false; message: string };
+   * one of the three distinct failure modes (SPEC §5 amendment).
+   *
+   * Wave 12: the SAME envelope now optionally carries the whole game log
+   * (`game/exportFormat.ts`'s `loggedGames`, additive to the v1 shape) --
+   * on success this always returns the parsed array (`[]` for a v1 file
+   * that never had one), and `App.tsx` merges it into the log via
+   * `ui/useGameLog.ts`'s `mergeImported`. This function itself never
+   * touches the log's own storage; it only surfaces what the file brought. */
+  importGame: (fileText: string) => { ok: true; loggedGames: LoggedGame[] } | { ok: false; message: string };
 }
 
 /** Converts a chosen engine move into `playMove`'s `options` -- the one
@@ -605,7 +613,7 @@ export function useGameController(
     const first = outcome.games[0];
     if (!first) return { ok: false as const, message: 'This file has no games in it.' };
     setGame(toGameState(first));
-    return { ok: true as const };
+    return { ok: true as const, loggedGames: outcome.loggedGames };
   }, []);
 
   // No seat chosen yet (first-run prompt still up): there is no game to

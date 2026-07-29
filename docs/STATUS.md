@@ -343,8 +343,26 @@ before Wave 14 delegation:**
 
 **Waves:**
 
-- **Wave 12 — game-log data layer** (`web-ui`; HELD pending PIN 1
-  approval): `LoggedGame` per OPPONENT-MODEL.md; storage as envelope v2
+- **Wave 12 — game-log data layer: COMPLETE, verifier PASS 8/8
+  2026-07-29 (one FAIL round: missing regression test for the Wave 5b
+  seat-preference invariant on the import-with-logged-games path — code
+  correct by trace, gap closed with a non-vacuous test, re-verified by
+  live mutation).** Delivered: LoggedGame per the pinned interface;
+  export envelope v2 (one optional additive field; literal-v1 migration
+  tested; 3+ hostile rejections); `fourwise:log` day-to-day store
+  (corrupt/newer/quota → empty log, never a crash); record-from-live-play
+  per §16.4; add-from-memory reusing Setup's real backtracking via one
+  additive export (finished games accepted there, still rejected by
+  Setup's check 4 — both run by the verifier on the same grid);
+  idempotent import merge de-duplicated by id; §16 sheet with BOTH
+  provenance labels on independent carriers (text + edge treatment,
+  screenshot-verified at 390px through a real static server, not vite
+  preview); `Games ▸` door in the Play action slot per §15.2. Four-seat
+  expectations hand-derived by the verifier before reading the tests;
+  four mutations caught by named tests. Web tests 310→396. Deferred by
+  documented scope (not defects): the "N more before predictions"
+  header clause (Wave 15), tappable rows/review entry (Wave 13).
+  Original scope line: `LoggedGame` per OPPONENT-MODEL.md; storage as envelope v2
   with a tested v1→v2 migration; record-from-live-play at game end (seat +
   moves + result + date + opponent label); reconstructed entry via the
   existing Setup/replay path (`source: 'reconstructed'`); export/import

@@ -155,8 +155,16 @@ const LINE_DIRECTIONS: ReadonlyArray<readonly [number, number]> = [
   [1, -1], // diagonal \
 ];
 
-/** Check 4: a four-in-a-row already completed, for either colour. */
-export function findExistingFour(grid: Grid): SetupRejection | null {
+/** Scans for a completed four-in-a-row and returns ITS COLOUR, or `null` if
+ * none exists -- the same directional scan `findExistingFour` uses to reject
+ * a Setup board, factored out so a FINISHED-game caller (`game/
+ * reconstructedLog.ts`, Wave 12: logging a game reconstructed from memory)
+ * can ask "who won, if anyone" without duplicating this scan a second time.
+ * Unlike `findExistingFour`, this is not itself a rejection -- a finished
+ * game is exactly the case Setup mode (continuing play) must refuse, but
+ * the game-log path needs the opposite: a four-in-a-row here is the whole
+ * point. */
+export function winningColour(grid: Grid): Colour | null {
   for (let c = 0; c < BOARD_COLUMNS; c++) {
     for (let r = 0; r < BOARD_ROWS; r++) {
       const colour = grid[c]![r];
@@ -170,16 +178,21 @@ export function findExistingFour(grid: Grid): SetupRejection | null {
           if (grid[cc]![rr] !== colour) break;
           count++;
         }
-        if (count >= 4) {
-          return {
-            code: 'existing-four-in-a-row',
-            message: `${cap(colour)} already has four in a row on this board — impossible to set up a position where the game isn't already over.`,
-          };
-        }
+        if (count >= 4) return colour;
       }
     }
   }
   return null;
+}
+
+/** Check 4: a four-in-a-row already completed, for either colour. */
+export function findExistingFour(grid: Grid): SetupRejection | null {
+  const colour = winningColour(grid);
+  if (!colour) return null;
+  return {
+    code: 'existing-four-in-a-row',
+    message: `${cap(colour)} already has four in a row on this board — impossible to set up a position where the game isn't already over.`,
+  };
 }
 
 /** Each column's discs, bottom-to-top, with the empty rows above dropped. */
@@ -235,8 +248,14 @@ function tryReconstructOrder(columns: Colour[][], firstMover: Colour): string | 
 /** Check 5: does any legal move ordering reach this board under the
  * declared `firstMover`? If not, and flipping `firstMover` would make it
  * reachable, the rejection says so (SPEC §3.3). Assumes checks 1-4 already
- * passed -- called only from `validateSetup` below. */
-function reconstructMoveOrder(grid: Grid, firstMover: Colour): SetupOutcome {
+ * passed -- called only from `validateSetup` below.
+ *
+ * Exported (Wave 12) so `game/reconstructedLog.ts` can reuse this SAME
+ * backtracking search for a FINISHED game (one Setup's own `validateSetup`
+ * would reject at check 4) without reimplementing it -- this function
+ * itself never checks for an existing four-in-a-row, so it is already
+ * correct for that case unmodified. */
+export function reconstructMoveOrder(grid: Grid, firstMover: Colour): SetupOutcome {
   const columns = compactColumns(grid);
   const moves = tryReconstructOrder(columns, firstMover);
   if (moves !== null) return { ok: true, moves };

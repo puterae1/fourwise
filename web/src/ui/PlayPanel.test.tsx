@@ -9,7 +9,7 @@
 
 import '@testing-library/jest-dom/vitest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { PlayPanel } from './PlayPanel.js';
 import type { LevelQualifier } from './types.js';
 
@@ -29,6 +29,7 @@ function baseProps() {
     onRedo: noop,
     canUndo: false,
     canRedo: false,
+    onOpenGames: noop,
   };
 }
 
@@ -114,5 +115,14 @@ describe('PlayPanel — level-label honesty (SPEC §3.1 amendment)', () => {
     select.value = 'perfect';
     select.dispatchEvent(new Event('change', { bubbles: true }));
     expect(onLevelChange).toHaveBeenCalledWith('yellow', 'perfect');
+  });
+});
+
+describe('PlayPanel — the "Games ▸" door (Wave 12, design §15.2)', () => {
+  it('renders a Games door alongside Undo/Redo and calls onOpenGames when pressed', () => {
+    const onOpenGames = vi.fn();
+    render(<PlayPanel {...baseProps()} levelQualifiers={{ red: null, yellow: null }} onOpenGames={onOpenGames} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Games ▸' }));
+    expect(onOpenGames).toHaveBeenCalled();
   });
 });

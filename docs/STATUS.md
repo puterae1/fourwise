@@ -385,6 +385,8 @@ before Wave 14 delegation:**
   four mutations caught by named tests. Web tests 310→396. Deferred by
   documented scope (not defects): the "N more before predictions"
   header clause (Wave 15), tappable rows/review entry (Wave 13).
+  **DEPLOYED 2026-07-29: run 30429425162 green (owner-ordered publish);
+  live site 200, book.bin still serving at 1,165,492 B.**
   Original scope line: `LoggedGame` per OPPONENT-MODEL.md; storage as envelope v2
   with a tested v1→v2 migration; record-from-live-play at game end (seat +
   moves + result + date + opponent label); reconstructed entry via the

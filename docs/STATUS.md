@@ -13,9 +13,13 @@
 
 ## Now
 
-- **Phase 2 CLOSED** (gate SIGNED 2026-07-29). **Phase 3 NOT STARTED** — wave
-  breakdown proposed to owner 2026-07-29, awaiting approval; nothing begins
-  until it is approved and recorded here. Phase 4 remains unsanctioned.
+- **Phase 2 CLOSED** (gate SIGNED 2026-07-29). **Phase 3 wave plan
+  APPROVED by owner 2026-07-29** (plan of record below, incl. four pin
+  rulings and the split gate). **Wave 12 is HELD until the owner reviews
+  and approves the PIN 1 rule definitions** (drafted 2026-07-29, sent for
+  review). Design-lead one-shot for the three new surfaces: SANCTIONED,
+  launched headless (result recorded when verified). Phase 4 remains
+  unsanctioned.
 - **Wave 11 (immediate-win guard) COMPLETE, verifier PASS 7/7, DEPLOYED
   2026-07-29** (deploy run 30411030824 green, owner-ordered). Live-artifact
   verification PASS: the deployed wasm bytes themselves (sha
@@ -277,6 +281,73 @@ pre-signature pass 6/6 with live screenshots; deployed (run 30398241459).
   owner rulings that shaped it (detached generation; write/read-boundary
   verification split across waves; tactical fallback tested book-absent with
   a permanent disable flag) are preserved in the wave log and ENGINE.md.
-- **Phase 3:** proposal delivered to owner 2026-07-29 — wave breakdown to be
-  recorded here VERBATIM upon approval. Nothing starts before that.
 - **Phase 4:** unsanctioned (`docs/ROADMAP.md`).
+
+## Phase 3 wave plan (PLAN OF RECORD — owner-approved 2026-07-29, with
+four pin rulings and one gate amendment folded in)
+
+Scope: ROADMAP Phase 3 (game log, post-game review, opponent model,
+prediction display, JSON export/import), governed by
+`docs/OPPONENT-MODEL.md`. Web-only; zero engine changes expected — any
+wave that discovers it genuinely needs engine support STOPS and reports.
+No machine learning (ROADMAP's explicit warning stands).
+
+**Owner pin rulings (2026-07-29), to be amended into OPPONENT-MODEL.md
+before Wave 14 delegation:**
+
+- **PIN 1 — rule-satisfaction definitions:** drafted by the orchestrator,
+  OWNER REVIEW PENDING — Wave 12 held until approved. Owner addition:
+  `blocks_diagonal` is the point of the whole model; its fixtures get the
+  most adversarial treatment, INCLUDING a threat cell that is BOTH
+  diagonal and horizontal (where a naive classifier double-counts or
+  misattributes), and that case is mutation-tested specifically.
+- **PIN 2 (owner-corrected):** an exploitation line surfaces when a rule
+  has ≥ 6 observations AND posterior mean < 0.4 (weakness) or > 0.75
+  (strength) — six is roughly where Beta-Bernoulli with the doc's priors
+  stops being prior-dominated. **DISPLAY RAW COUNTS, never the
+  posterior** — "missed a diagonal in 7 of 9 chances" is the product; the
+  mean is internal machinery only. Both the threshold and the display
+  rule are pinned.
+- **PIN 3 — live vs reconstructed weight: 1.0 / 0.5.** Halve
+  reconstructed. A real discount, defensible, reasonable to explain.
+- **PIN 4 — counts keyed by opponent label; single-opponent UI first.**
+  Pooling would average the primary opponent with anyone else, which
+  destroys the only thing the model is for.
+
+**Waves:**
+
+- **Wave 12 — game-log data layer** (`web-ui`; HELD pending PIN 1
+  approval): `LoggedGame` per OPPONENT-MODEL.md; storage as envelope v2
+  with a tested v1→v2 migration; record-from-live-play at game end (seat +
+  moves + result + date + opponent label); reconstructed entry via the
+  existing Setup/replay path (`source: 'reconstructed'`); export/import
+  round-trip with the house hostile-input rejection pattern. Minimal
+  log-list UI only.
+- **Wave 13 — post-game review** (`web-ui`): step through a logged game
+  with evaluation at every ply (existing analysis client; book covers
+  openings; §3.1 partial-honesty conventions apply), blunders marked with
+  the existing verdict-only semantics, all wording through the single
+  seat-translation point. Preceded by the SANCTIONED design-lead one-shot
+  (headless Opus, bounded amendment for the three new surfaces: log list,
+  review stepper, prediction display).
+- **Wave 14 — opponent model core, logic only** (`web-ui`, test-first):
+  seven-rule classifier per the approved PIN 1 definitions (adversarial
+  `blocks_diagonal` fixtures per the owner addition), Beta-Bernoulli
+  updates with the doc's priors as pseudo-counts, prediction scoring +
+  normalisation, top-3 with confidence, exploitation summaries per PIN 2,
+  PIN 3 weighting, 20-game floor as pure logic. No UI.
+- **Wave 15 — model UI + code gate** (`web-ui`, then `verifier` + owner):
+  prediction display visually distinct from optimal (ROADMAP gate #2),
+  honest confidence including low (gate #3), below-20 count-and-needed
+  display, four-seat wording sweep over every new surface, gate audit on
+  the deployed artifact.
+
+**Gate split (owner amendment 2026-07-29):** the Phase 3 gate has two
+distinct halves, recorded separately —
+1. **Code gate** (blocks Phase 3 closure of the build): logging, review,
+   model correct on synthetic data, 20-game floor enforced, prediction
+   visually distinct, honest confidence. Passes on delivery + verifier +
+   owner signature.
+2. **20-real-games criterion: OWNER-PENDING, non-blocking** — waiting on
+   the owner to play and log real games. Phase 3 is not "stalled" while
+   this accumulates; the floor mechanism ships enforced from day one.

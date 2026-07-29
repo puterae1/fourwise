@@ -96,13 +96,37 @@
 
 .games-sheet__row {
   position: relative;
-  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
   border-top: 1px solid var(--c-n-3);
-  min-height: 44px;
 }
 
 .games-sheet__row:first-child {
   border-top: none;
+}
+
+/* Design §16.2: the whole row is the hit target, min 44px in practice at
+ * four lines -- a plain button so it's keyboard-operable (Enter/Space) and
+ * screen-reader-focusable, not merely clickable. Hover is a 1px `--c-n-3`
+ * ring; focus is the house 3px `Signal` outline (§10, §16.2). */
+.games-sheet__row-button {
+  appearance: none;
+  border: none;
+  background: none;
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+  min-height: 44px;
+  border-radius: var(--r-sm);
+}
+
+.games-sheet__row-button:hover {
+  box-shadow: inset 0 0 0 1px var(--c-n-3);
+}
+
+.games-sheet__row-button:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: -2px;
 }
 
 /* Design §16.2: solid full-height Frame edge = LIVE; dashed half-height

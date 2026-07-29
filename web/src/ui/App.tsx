@@ -22,6 +22,7 @@ import { SetupPanel } from './SetupPanel.js';
 import { SaveLiveGameControl } from './SaveLiveGameControl.js';
 import { SaveReconstructedPanel } from './SaveReconstructedPanel.js';
 import { GamesSheet } from './GamesSheet.js';
+import { ReviewStepper } from './ReviewStepper.js';
 import { MoveList } from './MoveList.js';
 import { Rail, isDesktopLayout } from './Rail.js';
 import { isColumnFull } from './deriveBoard.js';
@@ -42,7 +43,7 @@ import { userMovesFirst, type Seat } from '../game/seat.js';
 import { enginePosition, type GameState } from '../game/gameState.js';
 import { parityRows } from '../game/parity.js';
 import { exportGameState } from '../game/exportFormat.js';
-import { buildLoggedGame, mostRecentOpponentLabel } from '../game/loggedGame.js';
+import { buildLoggedGame, mostRecentOpponentLabel, type LoggedGame } from '../game/loggedGame.js';
 import { reconstructFinishedGame } from '../game/reconstructedLog.js';
 import type { TranslatedAnalysis } from '../game/verdict.js';
 import './App.css';
@@ -146,6 +147,13 @@ function App() {
   const [gamesSheetOpen, setGamesSheetOpen] = useState(false);
   const [loggingFromMemory, setLoggingFromMemory] = useState(false);
 
+  // Wave 13 (design §17): post-game review is a SURFACE over a `LoggedGame`
+  // reached from the sheet, not a fourth mode (§19 ratified) -- `reviewGame`
+  // being non-null renders `ReviewStepper` as a full-screen overlay on top
+  // of whatever mode/sheet state the live app is in, and leaves the live
+  // game (`controller.game`) completely untouched underneath it.
+  const [reviewGame, setReviewGame] = useState<LoggedGame | null>(null);
+
   // Persist the current game (SPEC §5, "current game survives a refresh")
   // on every change -- moves, undo/redo, jump-to-ply, mode switches, and a
   // fresh Setup-derived game all funnel through `controller.game`, so one
@@ -178,6 +186,10 @@ function App() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (!controller) return;
+      // Review (design §17) owns keyboard input while it's open -- its own
+      // listener (`ReviewStepper.tsx`) drives stepping/Escape; the live
+      // game's digit/undo/redo keys must never also fire underneath it.
+      if (reviewGame) return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
       if (isTextEntryTarget(target)) return;
@@ -204,7 +216,7 @@ function App() {
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [controller, setup]);
+  }, [controller, setup, reviewGame]);
 
   if (!controller) {
     return (
@@ -264,6 +276,20 @@ function App() {
 
   function handleCloseGamesSheet() {
     setGamesSheetOpen(false);
+  }
+
+  // Design §17: opening a row's review closes the sheet and shows the
+  // review surface full-screen; `‹ Games` / Escape (`ReviewStepper`'s own
+  // listener) reverses exactly that -- back to the sheet, per §17.1's "‹
+  // Games" back control.
+  function handleOpenReview(game: LoggedGame) {
+    setGamesSheetOpen(false);
+    setReviewGame(game);
+  }
+
+  function handleCloseReview() {
+    setReviewGame(null);
+    setGamesSheetOpen(true);
   }
 
   // design §16.4: reuses Setup's existing grid-editing machinery wholesale
@@ -562,7 +588,10 @@ function App() {
         onAddFromMemory={handleAddFromMemory}
         onExport={handleExport}
         onImport={handleImportClick}
+        onOpenReview={handleOpenReview}
       />
+
+      {reviewGame && <ReviewStepper key={reviewGame.id} game={reviewGame} client={client} onClose={handleCloseReview} />}
     </div>
   );
 }

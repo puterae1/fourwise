@@ -6,6 +6,7 @@ import {
   loggedGameProvenanceLabel,
   loggedGameResultLine,
   loggedGameSeatLine,
+  reviewSeatSentence,
 } from './logCopy.js';
 import type { Seat } from '../game/seat.js';
 
@@ -68,5 +69,19 @@ describe('loggedGameProvenanceLabel (both states always labelled)', () => {
   it('labels live and reconstructed distinctly, with the numeric discount stated', () => {
     expect(loggedGameProvenanceLabel('live')).toBe('LIVE');
     expect(loggedGameProvenanceLabel('reconstructed')).toBe('RECONSTRUCTED · COUNTS HALF');
+  });
+});
+
+describe('reviewSeatSentence (design §17.1, R8: colour never implies order)', () => {
+  it('states both facts, in two plain sentences, for all four seat combinations', () => {
+    const cases: Array<{ seat: Seat; expected: string }> = [
+      { seat: { firstMover: 'yellow', userColour: 'red' }, expected: 'You were red. She moved first.' },
+      { seat: { firstMover: 'red', userColour: 'yellow' }, expected: 'You were yellow. She moved first.' },
+      { seat: { firstMover: 'red', userColour: 'red' }, expected: 'You were red. You moved first.' },
+      { seat: { firstMover: 'yellow', userColour: 'yellow' }, expected: 'You were yellow. You moved first.' },
+    ];
+    for (const { seat, expected } of cases) {
+      expect(reviewSeatSentence(seat)).toBe(expected);
+    }
   });
 });

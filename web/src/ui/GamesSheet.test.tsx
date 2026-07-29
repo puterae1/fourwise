@@ -43,13 +43,13 @@ function reconstructedGame(overrides: Partial<Parameters<typeof buildLoggedGame>
 describe('GamesSheet', () => {
   it('renders nothing when closed', () => {
     render(
-      <GamesSheet open={false} onClose={noop} games={[]} onAddFromMemory={noop} onExport={noop} onImport={noop} />,
+      <GamesSheet open={false} onClose={noop} games={[]} onAddFromMemory={noop} onExport={noop} onImport={noop} onOpenReview={noop} />,
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('shows the empty state, with no Export control, when there are no games', () => {
-    render(<GamesSheet open games={[]} onClose={noop} onAddFromMemory={noop} onExport={noop} onImport={noop} />);
+    render(<GamesSheet open games={[]} onClose={noop} onAddFromMemory={noop} onExport={noop} onImport={noop} onOpenReview={noop} />);
     expect(screen.getByText('No games logged yet.')).toBeInTheDocument();
     expect(screen.getByText(/add one from memory/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /export/i })).not.toBeInTheDocument();
@@ -63,7 +63,7 @@ describe('GamesSheet', () => {
         onClose={noop}
         onAddFromMemory={noop}
         onExport={noop}
-        onImport={noop}
+        onImport={noop} onOpenReview={noop}
       />,
     );
 
@@ -89,7 +89,7 @@ describe('GamesSheet', () => {
         onClose={noop}
         onAddFromMemory={noop}
         onExport={noop}
-        onImport={noop}
+        onImport={noop} onOpenReview={noop}
       />,
     );
     const labels = screen.getAllByText('Anna');
@@ -102,21 +102,21 @@ describe('GamesSheet', () => {
 
   it('an unlabelled opponent reads "Unlabelled", never a guessed name', () => {
     render(
-      <GamesSheet open games={[liveGame({ opponent: '' })]} onClose={noop} onAddFromMemory={noop} onExport={noop} onImport={noop} />,
+      <GamesSheet open games={[liveGame({ opponent: '' })]} onClose={noop} onAddFromMemory={noop} onExport={noop} onImport={noop} onOpenReview={noop} />,
     );
     expect(screen.getByText('Unlabelled')).toBeInTheDocument();
   });
 
   it('Close calls onClose', () => {
     const onClose = vi.fn();
-    render(<GamesSheet open games={[]} onClose={onClose} onAddFromMemory={noop} onExport={noop} onImport={noop} />);
+    render(<GamesSheet open games={[]} onClose={onClose} onAddFromMemory={noop} onExport={noop} onImport={noop} onOpenReview={noop} />);
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalled();
   });
 
   it('"Add a game from memory" calls onAddFromMemory', () => {
     const onAddFromMemory = vi.fn();
-    render(<GamesSheet open games={[]} onClose={noop} onAddFromMemory={onAddFromMemory} onExport={noop} onImport={noop} />);
+    render(<GamesSheet open games={[]} onClose={noop} onAddFromMemory={onAddFromMemory} onExport={noop} onImport={noop} onOpenReview={noop} />);
     fireEvent.click(screen.getByRole('button', { name: 'Add a game from memory' }));
     expect(onAddFromMemory).toHaveBeenCalled();
   });
@@ -125,11 +125,53 @@ describe('GamesSheet', () => {
     const onExport = vi.fn();
     const onImport = vi.fn();
     render(
-      <GamesSheet open games={[liveGame()]} onClose={noop} onAddFromMemory={noop} onExport={onExport} onImport={onImport} />,
+      <GamesSheet open games={[liveGame()]} onClose={noop} onAddFromMemory={noop} onExport={onExport} onImport={onImport} onOpenReview={noop} />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Export ▸' }));
     fireEvent.click(screen.getByRole('button', { name: 'Import ▸' }));
     expect(onExport).toHaveBeenCalled();
     expect(onImport).toHaveBeenCalled();
+  });
+});
+
+describe('Rows are tappable into review (design §16.2/§17, Wave 13)', () => {
+  it('clicking a row calls onOpenReview with THAT row\'s game', () => {
+    const onOpenReview = vi.fn();
+    const live = liveGame();
+    const reconstructed = reconstructedGame();
+    render(
+      <GamesSheet
+        open
+        games={[live, reconstructed]}
+        onClose={noop}
+        onAddFromMemory={noop}
+        onExport={noop}
+        onImport={noop}
+        onOpenReview={onOpenReview}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /review the game against anna on 27 jul/i }));
+    expect(onOpenReview).toHaveBeenCalledWith(reconstructed);
+  });
+
+  it('every row is a real <button> -- keyboard-operable (Enter/Space fire the native click), not a div with an onClick', () => {
+    const onOpenReview = vi.fn();
+    render(
+      <GamesSheet
+        open
+        games={[liveGame()]}
+        onClose={noop}
+        onAddFromMemory={noop}
+        onExport={noop}
+        onImport={noop}
+        onOpenReview={onOpenReview}
+      />,
+    );
+    const row = screen.getByRole('button', { name: /review the game/i });
+    expect(row.tagName).toBe('BUTTON');
+    row.focus();
+    expect(row).toHaveFocus();
+    fireEvent.click(row); // jsdom's fireEvent.click on a focused native <button> is the Enter/Space-equivalent path
+    expect(onOpenReview).toHaveBeenCalledTimes(1);
   });
 });

@@ -34,6 +34,16 @@ export interface BoardProps {
    * itself: passing `null` and passing rows are the caller's only two
    * options, so an unlabelled highlight can't happen by construction. */
   parityUserRows: Row[] | null;
+  /** Design §17.5 (review stepper): "stepping back, jumping more than one
+   * ply, tapping the track, or scrubbing places discs instantly — a rewind
+   * animation would assert a physical event that never happened." Every
+   * OTHER caller (Play, Analyse, Setup) always plays a genuine single move
+   * forward, so this defaults to `false` (the existing drop animation,
+   * unchanged) and is never passed by them. `prefers-reduced-motion` already
+   * removes the animation globally regardless of this prop (index.css) — this
+   * is the ADDITIONAL, non-motion-preference case where a caller knows no
+   * physical drop actually just happened. */
+  instant?: boolean;
 }
 
 const COLUMN_INDICES = Array.from({ length: BOARD_COLUMNS }, (_, i) => i);
@@ -61,6 +71,7 @@ export function Board({
   onDrop,
   canDrop,
   parityUserRows,
+  instant = false,
 }: BoardProps) {
   const winCells = useMemo(() => {
     const set = new Set<string>();
@@ -84,7 +95,7 @@ export function Board({
   }, [winLine]);
 
   return (
-    <div className="board">
+    <div className="board" data-instant={instant}>
       <div className="board__topbar">
         <span
           className="board__turn-caret"

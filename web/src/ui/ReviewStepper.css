@@ -1,0 +1,72 @@
+/* Post-game review — docs/DESIGN-DIRECTION.md §17. Reached from the games
+ * sheet (§19 ratified: a surface, not a fourth mode) -- rendered as a
+ * full-screen overlay over whatever mode was active, the same way the games
+ * sheet itself sits over the app (§16.1), just opaque instead of a sheet. */
+
+.review-stepper {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: var(--c-page);
+  overflow-y: auto;
+  padding-bottom: var(--sp-5);
+}
+
+.review-stepper__main {
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+@media (min-width: 900px) {
+  .review-stepper__main {
+    max-width: 560px;
+  }
+}
+
+.review-stepper__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--gutter) 0;
+}
+
+.review-stepper__back {
+  appearance: none;
+  border: none;
+  background: none;
+  font-family: var(--f-body);
+  font-weight: var(--w-body-strong);
+  font-size: var(--t-micro-size);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-signal);
+  cursor: pointer;
+  min-height: 44px;
+  padding: 0 var(--sp-2) 0 0;
+}
+
+.review-stepper__back:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+.review-stepper__title {
+  font-family: var(--f-body);
+  font-weight: var(--w-body-strong);
+  font-size: var(--t-body-size);
+  color: var(--c-n-9);
+  text-align: right;
+}
+
+.review-stepper__seat-line {
+  margin: 0;
+  padding: 0 var(--gutter);
+  font-family: var(--f-body);
+  font-size: var(--t-body-size);
+  color: var(--c-n-5);
+}

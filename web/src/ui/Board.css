@@ -238,6 +238,12 @@
   animation: board-disc-drop calc(var(--dur-drop) + var(--dur-settle)) var(--ease-drop);
 }
 
+/* Design §17.5: a jump/rewind/scrub never plays the drop animation -- only
+ * a genuine single move forward does (see `Board.tsx`'s `instant` prop). */
+.board[data-instant='true'] .board__disc {
+  animation: none;
+}
+
 .board__disc[data-colour='red'] {
   background: var(--c-red);
 }

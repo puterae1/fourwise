@@ -1,0 +1,127 @@
+/* Review ply track + stepper — docs/DESIGN-DIRECTION.md §17.2. Marks use
+ * §12 tokens only (§15.1: no new tokens) -- `--c-n-5`/`--c-n-9` ink, never a
+ * hue, per §17.2's own table. */
+
+.review-track {
+  padding: 0 var(--gutter);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.review-track__ticks {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  overflow-x: auto;
+  padding: var(--sp-1) 0;
+}
+
+.review-track__ticks:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+.review-track__tick-col {
+  flex: 0 0 auto;
+  width: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.review-track__tick {
+  width: 6px;
+  height: 14px;
+  border-radius: 1px;
+  background: var(--tick-colour, var(--c-n-3));
+}
+
+/* Design §17.2: "the tick becomes a full-height 3px Frame bar" -- the
+ * current ply's OWN tick loses its hue and becomes the cursor. Higher
+ * specificity than `.review-track__tick` alone wins this without `!important`. */
+.review-track__tick[data-current='true'] {
+  width: 3px;
+  background: var(--c-frame);
+}
+
+.review-track__mark {
+  display: block;
+  width: 7px;
+  height: 7px;
+  box-sizing: border-box;
+}
+
+.review-track__mark[data-kind='unevaluated'] {
+  margin: 2px;
+  width: 3px;
+  height: 3px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--c-n-5);
+  background: none;
+}
+
+.review-track__mark[data-kind='clean'] {
+  margin: 2px;
+  width: 3px;
+  height: 3px;
+  border-radius: var(--r-full);
+  background: var(--c-n-5);
+}
+
+.review-track__mark[data-kind='blunder'] {
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 7px solid var(--c-n-9);
+}
+
+.review-track__caption {
+  margin: 0;
+  font-family: var(--f-body);
+  font-size: var(--t-micro-size);
+  color: var(--c-n-5);
+}
+
+.review-track__stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-1);
+}
+
+.review-track__step-button {
+  appearance: none;
+  border: 1px solid var(--c-n-3);
+  background: var(--c-n-0);
+  border-radius: var(--r-sm);
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 var(--sp-2);
+  font-family: var(--f-body);
+  font-weight: var(--w-body-strong);
+  font-size: var(--t-body-size);
+  color: var(--c-n-9);
+  cursor: pointer;
+}
+
+.review-track__step-button:disabled {
+  color: var(--c-n-5);
+  cursor: default;
+}
+
+.review-track__step-button:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+.review-track__counter {
+  font-family: var(--f-body);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--t-body-size);
+  color: var(--c-n-9);
+  white-space: nowrap;
+}

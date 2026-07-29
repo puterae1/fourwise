@@ -402,13 +402,34 @@ before Wave 14 delegation:**
   existing Setup/replay path (`source: 'reconstructed'`); export/import
   round-trip with the house hostile-input rejection pattern. Minimal
   log-list UI only.
-- **Wave 13 — post-game review** (`web-ui`): step through a logged game
-  with evaluation at every ply (existing analysis client; book covers
-  openings; §3.1 partial-honesty conventions apply), blunders marked with
-  the existing verdict-only semantics, all wording through the single
-  seat-translation point. Preceded by the SANCTIONED design-lead one-shot
-  (headless Opus, bounded amendment for the three new surfaces: log list,
-  review stepper, prediction display).
+- **Wave 13 — post-game review: COMPLETE, verifier PASS 7/7 2026-07-29.**
+  Delivered: tappable sheet rows (§16.2 treatments) opening a full-screen
+  review surface per §17 — read-only board + reused §8.2 strip, stepper
+  (4×44 px + keyboard), ply track with the three mark states and running
+  not-evaluated count, on-demand per-ply evaluation through the real
+  analysis client with per-ply caching, blunders via a genuine
+  compareForBlunder import (partial-comparison guard mutation-tested),
+  Show-me gate exactly as Analyse (mutation-tested), terminal headline
+  derived from the REPLAYED BOARD not the stored result field (pinned by
+  a deliberately-mismatched fixture), the reviewed game's EMBEDDED seat
+  governing all wording (divergent-seat case pinned in test + verified
+  live; code-trace confirmed no session-seat path), Board gains an
+  additive `instant` prop so only a single forward step animates (§17.5;
+  existing callers unaffected). Verifier judgement item: the one-shot
+  evaluation cache (no retry on revisit) ruled an ACCEPTABLE tradeoff —
+  a permanently-partial ply keeps its honest "Still solving" copy, null
+  position verdict, and open-ring mark on every revisit (driven by a
+  temporary test, not just read). Web tests 396→441; four-seat
+  expectations hand-derived; browser pass on the built dist through a
+  real static server. Non-blocking, for owner awareness: a completed
+  game's FINAL ply-track tick stays an open ring forever (terminal
+  positions are never engine-analysed, by design), so the caption
+  bottoms out at "1 ply not evaluated yet." — honest, but a visible
+  artifact; candidates: accept as-is, or give the terminal tick its own
+  mark class in Wave 15 polish. Original scope: step through a logged
+  game with evaluation at every ply, blunders verdict-only, wording
+  through the single seat-translation point; design direction landed
+  ahead of the wave (design-lead §§15–19, owner-ratified).
 - **Wave 14 — opponent model core, logic only** (`web-ui`, test-first):
   seven-rule classifier per the approved PIN 1 definitions (adversarial
   `blocks_diagonal` fixtures per the owner addition), Beta-Bernoulli

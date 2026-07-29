@@ -45,6 +45,19 @@ export function loggedGameSeatLine(seat: Seat): string {
 }
 
 /**
+ * Design §17.1's review header: "You were yellow. She moved first." — the
+ * SAME two facts as `loggedGameSeatLine` above (R8: colour never implies
+ * order), reformatted as two plain sentences for the review header's own
+ * punctuation rather than the sheet row's `·`-joined clause. Always
+ * translated from the REVIEWED game's own `seat`, which may differ from the
+ * app's active session seat (Wave 13 DoD item 4).
+ */
+export function reviewSeatSentence(seat: Seat): string {
+  const firstSentence = userMovesFirst(seat) ? 'You moved first.' : 'She moved first.';
+  return `You were ${seat.userColour}. ${firstSentence}`;
+}
+
+/**
  * Design §16.2, row line 3: "Result, from the user's seat" -- `You won` /
  * `She won` / `Drawn`, exactly as pinned (never "Red won").
  */

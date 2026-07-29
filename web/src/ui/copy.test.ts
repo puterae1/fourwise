@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blunderSentence, terminalOutcome } from './copy.js';
+import { blunderSentence, reviewPlyContextLine, terminalOutcome } from './copy.js';
 import type { Seat } from '../game/seat.js';
 
 describe('blunderSentence', () => {
@@ -64,5 +64,29 @@ describe('terminalOutcome (SPEC §3.2 terminal-display amendment, SPEC §1 seat 
   it('winnerControl is irrelevant when the user themself is the winner -- always "you won", never "the engine"', () => {
     const seat: Seat = { firstMover: 'red', userColour: 'red' };
     expect(terminalOutcome(seat, 'red', 'engine')).toEqual({ kind: 'win', sentence: 'Game over — you won.' });
+  });
+});
+
+describe('reviewPlyContextLine (design §17.1, seat-translated from the REVIEWED game\'s own seat)', () => {
+  it('names the mover as "your move" when the mover is the user\'s own colour', () => {
+    const seat: Seat = { firstMover: 'red', userColour: 'red' };
+    expect(reviewPlyContextLine(14, 31, seat, 'red')).toBe('Ply 14 of 31 — your move.');
+  });
+
+  it('names the mover as "her move" when the mover is not the user\'s colour', () => {
+    const seat: Seat = { firstMover: 'red', userColour: 'red' };
+    expect(reviewPlyContextLine(14, 31, seat, 'yellow')).toBe('Ply 14 of 31 — her move.');
+  });
+
+  it('turn order never leaks in: the SAME mover colour reads "your move" regardless of who moves first', () => {
+    const userFirst: Seat = { firstMover: 'yellow', userColour: 'yellow' };
+    const userSecond: Seat = { firstMover: 'red', userColour: 'yellow' };
+    expect(reviewPlyContextLine(5, 20, userFirst, 'yellow')).toBe('Ply 5 of 20 — your move.');
+    expect(reviewPlyContextLine(5, 20, userSecond, 'yellow')).toBe('Ply 5 of 20 — your move.');
+  });
+
+  it('drops the mover clause entirely at a terminal position (mover null)', () => {
+    const seat: Seat = { firstMover: 'red', userColour: 'red' };
+    expect(reviewPlyContextLine(31, 31, seat, null)).toBe('Ply 31 of 31.');
   });
 });

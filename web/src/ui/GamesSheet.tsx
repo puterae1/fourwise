@@ -1,11 +1,11 @@
 // The games sheet — docs/DESIGN-DIRECTION.md §16. Full-height sheet over
 // whatever mode is active (mirrors `MoveList.tsx`'s own sheet pattern:
 // `--c-n-0` ground, `--r-lg` top corners, `Close` returns to exactly where
-// the user left). Wave 12 scope: the log list ONLY -- no exploitation
-// summary (§18, Wave 15), no review entry point on a row (§17, Wave 13:
-// rows are not yet tappable into anything), no prediction floor count.
-// Newest first, sorted by date and ONLY date (never result, never
-// provenance, never colour).
+// the user left). Wave 12 scope was the log list ONLY; Wave 13 (§16.2's row
+// hover/focus treatments, §17) makes each row tappable (keyboard included)
+// into the post-game review stepper -- no exploitation summary (§18, Wave
+// 15), no prediction floor count. Newest first, sorted by date and ONLY
+// date (never result, never provenance, never colour).
 
 import type { LoggedGame } from '../game/loggedGame.js';
 import {
@@ -25,26 +25,37 @@ export interface GamesSheetProps {
   onAddFromMemory: () => void;
   onExport: () => void;
   onImport: () => void;
+  /** Design §17: a row opens that game's post-game review. */
+  onOpenReview: (game: LoggedGame) => void;
 }
 
-function GameRow({ game }: { game: LoggedGame }) {
+function GameRow({ game, onOpenReview }: { game: LoggedGame; onOpenReview: (game: LoggedGame) => void }) {
+  const dateLabel = loggedGameDateLabel(game.date);
+  const opponentLabel = loggedGameOpponentLabel(game.opponent);
   return (
     <li className="games-sheet__row" data-source={game.source}>
       <span className="games-sheet__row-edge" data-source={game.source} aria-hidden="true" />
-      <p className="games-sheet__row-line1">
-        <span className="games-sheet__row-date">{loggedGameDateLabel(game.date)}</span>{' '}
-        <span className="games-sheet__row-label">{loggedGameOpponentLabel(game.opponent)}</span>
-      </p>
-      <p className="games-sheet__row-line2">{loggedGameSeatLine(game.seat)}</p>
-      <p className="games-sheet__row-line3">
-        {loggedGameResultLine(game.result)} {loggedGameMoveCountClause(game.moves.length)}
-      </p>
-      <p className="games-sheet__row-line4">{loggedGameProvenanceLabel(game.source)}</p>
+      <button
+        type="button"
+        className="games-sheet__row-button"
+        onClick={() => onOpenReview(game)}
+        aria-label={`Review the game against ${opponentLabel} on ${dateLabel}`}
+      >
+        <p className="games-sheet__row-line1">
+          <span className="games-sheet__row-date">{dateLabel}</span>{' '}
+          <span className="games-sheet__row-label">{opponentLabel}</span>
+        </p>
+        <p className="games-sheet__row-line2">{loggedGameSeatLine(game.seat)}</p>
+        <p className="games-sheet__row-line3">
+          {loggedGameResultLine(game.result)} {loggedGameMoveCountClause(game.moves.length)}
+        </p>
+        <p className="games-sheet__row-line4">{loggedGameProvenanceLabel(game.source)}</p>
+      </button>
     </li>
   );
 }
 
-export function GamesSheet({ open, onClose, games, onAddFromMemory, onExport, onImport }: GamesSheetProps) {
+export function GamesSheet({ open, onClose, games, onAddFromMemory, onExport, onImport, onOpenReview }: GamesSheetProps) {
   if (!open) return null;
 
   // Design §16.1: "Newest first. The sort key is date and only date." A
@@ -71,7 +82,7 @@ export function GamesSheet({ open, onClose, games, onAddFromMemory, onExport, on
             <p className="games-sheet__count">{games.length} logged</p>
             <ul className="games-sheet__list">
               {sorted.map((game) => (
-                <GameRow key={game.id} game={game} />
+                <GameRow key={game.id} game={game} onOpenReview={onOpenReview} />
               ))}
             </ul>
           </>

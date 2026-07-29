@@ -116,6 +116,20 @@ export interface TerminalOutcome {
  *                        "the engine won" from "she won", mirroring
  *                        `gameOverHeadline`'s own branching exactly.
  */
+/**
+ * The review stepper's context line (design §17.1: "Ply 14 of 31 — her
+ * move."). `mover` is `null` at a terminal position — no move is upcoming,
+ * so the mover clause is dropped entirely and the main headline sentence
+ * carries the game-over fact instead (`terminalOutcome`, SPEC §3.2). This is
+ * the single place a review ply's "whose move" wording is derived — always
+ * from the REVIEWED game's own `seat`, never the active session's.
+ */
+export function reviewPlyContextLine(currentPly: number, totalPlies: number, seat: Seat, mover: Colour | null): string {
+  const base = `Ply ${currentPly} of ${totalPlies}`;
+  if (mover === null) return `${base}.`;
+  return mover === seat.userColour ? `${base} — your move.` : `${base} — her move.`;
+}
+
 export function terminalOutcome(seat: Seat, winner: Colour | null, winnerControl: SideControl | 'human'): TerminalOutcome {
   if (winner === null) {
     return { kind: 'draw', sentence: 'Game over — drawn.' };

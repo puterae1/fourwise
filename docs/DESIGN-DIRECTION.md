@@ -818,3 +818,794 @@ signature impossible and the weakest colour weaker.
 4. **No dark theme in Phase 1.** Recorded as a decision, not an omission — see §12. If the
    owner wants one later it is not a token swap: the signature has to be redesigned, so it
    should be treated as a change of direction rather than a setting.
+
+---
+
+# AMENDMENT — PHASE 3 SURFACES (2026-07-29)
+
+Bounded, additive amendment covering the three surfaces Phase 3 introduces: the game log
+list (§16), the post-game review stepper (§17), and the opponent-model prediction display
+(§18). §§1–14 are unchanged and still govern. Nothing above this line was restyled,
+renumbered, or reworded. Governing specs for this amendment: `docs/OPPONENT-MODEL.md`,
+`docs/ROADMAP.md` Phase 3, and the Phase 3 wave plan in `docs/STATUS.md` (pin rulings 1–4).
+
+## 15. Phase 3 — scope, and the rules all three surfaces obey
+
+### 15.1 What Phase 3 adds to the visual system: nothing
+
+**No new tokens. §12 is byte-identical and stays byte-identical.** Every value below is an
+existing token used in an existing way. I checked each of the three surfaces for a value it
+could not express — a recessed ground, a provenance mark, a confidence bar, a twenty-step
+counter — and in every case the existing ramp, the existing shapes and the existing type
+scale carried it. Where I was tempted to add a semantic alias (`--c-surface-recessed`) I
+declined: an alias is a new name for `--c-n-2`, and one new name in §12 invites the next
+one. Implementers write `--c-n-2`.
+
+No new hue enters the interface. §1 still holds: hue belongs to the players. The opponent
+model is not a third player and gets no colour of its own.
+
+### 15.2 The one touch-point in §8
+
+The three surfaces need a door. Rather than add a fourth segment to the mode switch — which
+would restyle §10's three-equal-segments rule and demote the board's three modes to a menu —
+Phase 3 adds **one `--t-micro` `Signal` text control, `Games ▸`,** at the right end of the
+action slot: `Undo   Redo   Games ▸` on phone, appended after `Export` on desktop. It matches
+`raw scores ▸` exactly in vocabulary, weight and behaviour. It opens the games sheet (§16).
+
+The §8.1–§8.4 wireframes are **not redrawn**. They predate this amendment and are correct
+about everything they show. Read them as unamended except for that one control, which is
+drawn in §16.1.
+
+### 15.3 Rules that bind all three surfaces
+
+These are not style notes. Each one is checkable, and each exists because a specific way of
+getting Phase 3 wrong is easy.
+
+**R1 — Solver light, model ink.** The backlight (§9) and every one of its carriers — lit
+wells, warmed webbing, the lamp caret, the inverted verdict cell, the `wght 900` column
+number — belong to the **solver alone**, in every Phase 3 surface, permanently. The opponent
+model may never light a column, place a caret, invert a cell, or bold a column number. It is
+drawn in `--c-n-7` ink on a matte recessed ground and it does not glow, bloom, or warm.
+§9's quiet rule already forbids a second glowing thing; R1 says which of the two owns the
+only one.
+
+**R2 — The model never enters the board's coordinate space.** No ghost discs, no shaded
+columns, no marks in the wells, no cells in the verdict strip. The model's output is drawn
+in its own block, outside the board and outside the strip. This is a containment rule an
+implementer can test structurally: no model-derived value may render inside the board
+component or the verdict-strip component.
+
+**R3 — Different axis, different shape.** Solver quantities are **vertical** bars locked
+under their columns. Model quantities are **horizontal** bars in a stack of at most three
+rows, ordered by likelihood, never seven, never column-aligned. A reader who has learned
+"vertical under the column = what wins" cannot mistake a horizontal row for it.
+
+**R4 — Different surface plane.** Solver surfaces are raised: `--c-n-0` ground, `--el-raised`.
+Model surfaces are recessed: `--c-n-2` ground, no elevation, a 1px `--c-n-3` line along the
+top edge only. Nothing in the interface is both. The metaphor is physical and consistent with
+§2 — the solver's answers are objects sitting on the table; the model's are notes pressed
+into it.
+
+**R5 — Every model number carries its denominator; no solver number ever does.** `7 of 9`,
+`22 of her moves`, `14 of 20 games`. The verdict strip's numerals are bare (`11`, `9`, `–`).
+A number with a denominator is the model, always. A bare numeral is the solver, always.
+
+**R6 — The model never appears alone.** The prediction block does not render unless the
+solver's answer for the same position is rendered on the same screen. If analysis for that
+position is unavailable, still running, or terminal-superseded, the prediction block does not
+render either. This is the structural half of ROADMAP gate #2: a user can never be looking at
+a recommended column that came from the model with nothing from the solver beside it, because
+that state does not exist. Conflation needs the two to be alone together or fused; R2/R4
+prevent fusion and R6 prevents solitude.
+
+**R7 — Different grammar.** Model strings are about a person and are never verdicts. The
+words `win`, `wins`, `won`, `lose`, `loses`, `lost`, `draw`, `drawn`, `best`, `held` may not
+appear in any model string — including the exploitation lines, which describe *chances taken
+or missed*, not results. (`She took the immediate win in 9 of 9 chances` would violate this;
+the sanctioned phrasing is in §18.6.) Solver strings keep §11's verdict vocabulary unchanged.
+
+**R8 — Seat model, unchanged and explicit.** Colour never implies turn order in any new
+surface, and turn order never implies colour. Every logged game carries both
+`seat.firstMover` and `seat.userColour`; both are displayed, separately, as two facts. No
+combined chip, no `R/1st`, no inference of one from the other anywhere. A ply track that
+draws red first for every game is the bug — first tick hue comes from `seat.firstMover`. All
+results and all sentences are phrased from the user's seat (§5), never "Red won".
+
+**R9 — No invented data, restated for a surface that will be tempted.** These surfaces show
+counts, and a count that is not yet known must say so rather than show `0` or a dash that
+reads as zero. `Not evaluated` and `none yet` are the honest strings; §18.5's floor state is
+the fully designed case.
+
+**R10 — Reduced motion.** Nothing in these three surfaces animates under
+`prefers-reduced-motion: reduce`: no disc drop while stepping, no scrub easing, no sheet
+slide, no bar fill. Per §7 these are **removed**, not zero-durationed. Confidence bars and the
+twenty-tick counter do not animate under *any* motion setting — they are static by design,
+because §9's quiet rule allows exactly one moving bright thing and it is the lamp.
+
+### 15.4 Contrast on the recessed ground
+
+New pairings introduced by R4, recomputed from §12's hex values with the WCAG 2.x relative-
+luminance formula (sRGB linearised, `(L1+0.05)/(L2+0.05)`; method validated against the
+published reference pairs black-on-white 21.0 and `#767676`-on-white 4.54):
+
+| Pair | Ratio | Verdict |
+|---|---|---|
+| `--c-n-9` on `--c-n-2` | 10.63:1 | pass — headings, counts |
+| `--c-n-7` on `--c-n-2` | 8.25:1 | pass — confidence bar fill, **and all body and micro text on this ground** |
+| `--c-n-5` on `--c-n-2` | 4.44:1 | **fails AA for text** (4.5:1) — permitted only as a non-text graphical mark, where the threshold is 3:1 |
+| `--c-n-3` on `--c-n-2` | 1.20:1 | **decorative only** — the 1px top edge, never a mark carrying meaning |
+
+**Correction, 2026-07-29.** The first cut of this table was wrong: every figure was inflated
+by roughly 8–10% (11.6 / 9.0 / 4.85 / 1.3), which turned a fail into a pass. `--c-n-5` on
+`--c-n-2` is 4.44:1 and does **not** clear the 4.5:1 AA threshold for normal-size text. The
+figures above are the recomputed ones.
+
+**The rule that replaces the old floor: on `--c-n-2`, no text is lighter than `--c-n-7`.**
+Text ink on the recessed ground is `--c-n-9` or `--c-n-7`, and nothing else, at every size —
+`--t-micro` included, since 11px is nowhere near the 18.66pt-bold / 24pt large-text threshold
+and so takes the same 4.5:1 bar as body text. `--c-n-5` keeps exactly one job on this ground:
+non-text marks, which need 3:1, which 4.44:1 clears.
+
+I chose **moving the ink to `--c-n-7`** over demoting the affected text to a large-text size
+or weight. Two reasons. The demotion is not available in the first place — the text at issue
+is `--t-body` (15px/400) and `--t-micro` (11px/400), and reaching 18.66pt bold would mean
+enlarging a hedge sentence and a provenance line until they outweighed the numbers they
+qualify, which inverts the hierarchy to satisfy a checker. And `--c-n-7` is already the
+model's declared ink: R1 says the model "is drawn in `--c-n-7` ink on a matte recessed
+ground", so the fix makes §§18.2/18.5/18.6 consistent with R1 rather than adding anything.
+
+**What this costs, stated plainly.** `--c-n-5` was carrying "secondary rank" on the recessed
+ground, and the ramp has no other step between `--c-n-7` and a failing value. On `--c-n-2`,
+secondary rank is therefore carried by **size and weight only** — `--t-micro` against
+`--t-body-lg` — not by a lighter ink. This is a real reduction in tonal range inside the model
+block, and it is the correct trade: §12 stays byte-identical (§15.1), and the alternative was
+body text a user cannot read.
+
+The empty ticks of the twenty-step counter (§18.5) stay a 1px `--c-n-5` outline, not
+`--c-n-3`. They carry meaning ("games still needed"), they are non-text marks, and 4.44:1
+clears the 3:1 they must meet — whereas `--c-n-3`'s 1.20:1 does not.
+
+**Sweep result.** Every `--c-n-5` text specification in §§15–18 was checked against its actual
+ground. On `--c-n-0` (raised: the games sheet §16, the review stepper §17) `--c-n-5` is
+5.81:1 and passes — those are unchanged. Five instances sat on `--c-n-2` and are now
+`--c-n-7`: §18.2's remainder line and evidence line, §18.5's split line and floor-reason
+sentence, and §18.6's evidence-mix line.
+
+**Grayscale test, extended.** Print all three surfaces in black and white. Live must still be
+tellable from reconstructed, a blunder ply from a clean one, a logged game from a needed one,
+and the model's block from the solver's. All four are carried by form and words, so all four
+survive.
+
+---
+
+## 16. Game log list
+
+### 16.1 The sheet
+
+The games sheet is a full-height sheet in §10's existing vocabulary — `--c-n-0` ground,
+`--r-lg` top corners — presented over whatever mode is active. It is not a mode. `Close`
+returns to exactly the position and mode the user left.
+
+```
+┌────────────────────────────────────────┐
+│ GAMES                            Close │  --t-title  /  --t-micro Signal
+│ 14 logged · 6 more before predictions  │  --t-body, --c-n-5
+├────────────────────────────────────────┤
+│ WHERE ANNA IS WEAK                     │  exploitation summary, §18.6,
+│ Anna missed a diagonal block in 7 of 9 │  on --c-n-2 recessed ground.
+│ chances. Build diagonals.              │  Absent entirely until it has
+├────────────────────────────────────────┤  something to say.
+│ ▌ 29 Jul   Anna                        │  ▌ solid 3px Frame left edge,
+│   You were yellow · she moved first    │    full row height = LIVE
+│   You won · 27 moves                   │
+│   LIVE                                 │  --t-micro, --c-n-5
+├────────────────────────────────────────┤
+│ ╎ 27 Jul   Anna                        │  ╎ 3px dashed --c-n-5 left edge,
+│   You were red · you moved first       │    half row height = RECONSTRUCTED
+│   She won · 19 moves                   │
+│   RECONSTRUCTED · COUNTS HALF          │  --t-micro, --c-n-5
+├────────────────────────────────────────┤
+│ ▌ 26 Jul   Anna                        │
+│   You were red · she moved first       │
+│   Drawn · 42 moves                     │
+│   LIVE                                 │
+├────────────────────────────────────────┤
+│  Add a game from memory                │  --t-body-strong, Signal
+│  Export ▸        Import ▸              │  --t-micro Signal
+└────────────────────────────────────────┘
+```
+
+Newest first. The sort key is date and only date — never result, never provenance, never
+colour.
+
+### 16.2 The row
+
+Four lines, fixed order, every line present on every row:
+
+1. **Date and label.** `29 Jul` within the current year, `29 Jul 2025` otherwise. Date in
+   `--t-micro` `--c-n-5`, label in `--t-body-strong` `--c-n-9`. A game whose `opponent` field
+   is empty reads `Unlabelled` — never a substituted pronoun, never a guessed name (R9).
+2. **Seat, as two facts.** `You were yellow · she moved first`. Two independent clauses, You
+   first by role (§5), colour a property of the clause and never the sort key. The second
+   clause names whoever actually moved first — `you moved first` or `she moved first` / the
+   label. There is no arrangement of this line that lets colour imply order, because order is
+   stated in words (R8).
+3. **Result, from the user's seat.** `You won` / `She won` / `Drawn`, then `· N moves`. Never
+   "Red won". The `· N moves` is a length, not a verdict — it is deliberately *not* phrased
+   `in N` (§11's `You win in 11.` means moves-to-result from now, and reusing that shape here
+   would collide with it).
+4. **Provenance, always labelled.** `LIVE` or `RECONSTRUCTED · COUNTS HALF` in `--t-micro`
+   `--c-n-5`.
+
+**Both provenance states are labelled — this is the point.** The tempting design labels only
+the reconstructed rows and leaves live rows clean. That reads as "flagged" versus "normal",
+and it hides the discount at exactly the moment it matters: when the log is mostly
+reconstructed and the model is quietly running on half-weight evidence.
+`docs/OPPONENT-MODEL.md` says *weight live games higher and say so*; a row that says nothing
+is not saying so. Two labels, always.
+
+The discount is stated numerically (`COUNTS HALF`, per PIN 3's 1.0 / 0.5) rather than
+implied by the edge treatment, so the fact survives the grayscale test, screen readers, and
+a user who has never been told what a dashed edge means. The solid-vs-dashed edge and the
+full-vs-half height are redundant carriers of the same fact, in the manner of §4.
+
+Row hit target is the full row, minimum 44px tall in practice at four lines. Tap opens the
+review stepper (§17). Hover is a 1px `--c-n-3` ring; focus is §10's 3px `Signal` outline. No
+row is ever colour-coded by result.
+
+### 16.3 Empty and near-empty
+
+The log with nothing in it is not an error and is not a blank page:
+
+```
+│ GAMES                            Close │
+│ No games logged yet.                   │  --t-body-lg, --c-n-9
+│ Finish a game in Play and it is saved  │  --t-body, --c-n-5
+│ here. Or add one from memory.          │
+│                                        │
+│  Add a game from memory                │
+```
+
+`Export ▸` is absent — not disabled — while there is nothing to export. A dead control with
+nothing behind it is the pattern §8.3 already rejects.
+
+### 16.4 Adding a game from memory
+
+Reuses Setup's existing reconstruction path (§8.3) with its existing legality copy. One
+addition at the end of that flow: the opponent label field, the date, and a plain statement
+of what is about to be recorded —
+
+```
+│ This will be saved as reconstructed,   │  --t-body, --c-n-5
+│ and counts half as much as a game      │
+│ recorded live.                         │
+```
+
+Said before the save, not discovered afterwards in a row label. A game recorded live is never
+offered a provenance choice: `source` is a fact about how the game reached the log, not a
+setting.
+
+---
+
+## 17. Post-game review stepper
+
+### 17.1 What it is
+
+The logged game, replayed one ply at a time, with the board and the verdict strip doing
+exactly what they already do in Analyse. **Nothing new is invented here.** The review stepper
+is §8.2 with a game log driving the position and a ply track added below. Everything the
+analysis panel already promises about honesty it keeps.
+
+```
+┌────────────────────────────────────────┐
+│ ‹ Games          29 Jul · Anna         │  --t-micro Signal / --t-body-strong
+│ You were yellow. She moved first.      │  --t-body, --c-n-5 — two facts, R8
+├────────────────────────────────────────┤
+│  Ply 14 of 31 — her move.              │  --t-body-lg, --c-n-5
+│  That threw away a win. Column 4 held  │  --t-display, on --c-n-0 with a
+│  it.                                   │  3px Frame left edge (§8.1 blunder)
+├────────────────────────────────────────┤
+│      1   2   3   4   5   6   7         │
+│  ▲                                     │  turn caret, §5, its own slot
+│ ┌────────────────────────────────────┐ │
+│6│  ·   ·   ·   ·   ·   ·   ·         │ │  the board, unchanged
+│ …                                      │
+│ └────────────────────────────────────┘ │
+│ ┌───┬───┬───┬───┬───┬───┬───┐          │
+│ │▨▨ │░░ │▨▨ │███│   │▨▨ │░░ │          │  the verdict strip, unchanged:
+│ │ 13│  9│  7│ 11│  –│  9│  5│          │  §8.2 in full
+│ └───┴───┴───┴───┴───┴───┴───┘          │
+│ [ Show me ]              raw scores ▸  │
+├────────────────────────────────────────┤
+│ ⊙◍⊙◍⊙◍⊙◍⊙◍⊙◍⊙▌◍⊙◍⊙◍⊙◍⊙◍⊙◍⊙◍⊙◍⊙        │  ply track: one tick per ply,
+│ ·▾·  ·  · ·  ·▾ ○ ○ ○ ○ ○ ○ ○ ○        │  hue = whose. ▌ = current ply
+│ 8 plies not evaluated yet.             │  --t-micro, --c-n-5
+│  ‹ Back          14 / 31        Next › │  44px targets, ← → keys
+├────────────────────────────────────────┤
+│ WHAT ANNA MAY PLAY                     │  §18, recessed --c-n-2 block,
+│  4  ████████████░░░░░░░░  40%          │  present only when it is her ply
+│ …                                      │
+└────────────────────────────────────────┘
+```
+
+### 17.2 The ply track
+
+One tick per ply, in play order, 6px wide, 14px tall, tinted to the hue of the side that
+played it. Play order is real sequence data taken from the game, not an implied ordering, so
+§5's prohibition does not apply — but the first tick's hue is derived from `seat.firstMover`
+and never assumed (R8).
+
+Below each tick, one **evaluation mark**, and this is where the stepper earns its honesty:
+
+| Mark | Meaning |
+|---|---|
+| `·` 3px `--c-n-5` dot | evaluated; no blunder |
+| `▾` 7px filled `--c-n-9` wedge | evaluated; this move threw away a result |
+| `○` 1px `--c-n-5` open ring | **not evaluated yet** |
+
+The open ring is not a placeholder for a mark that is coming — it is the honest statement
+that this ply has not been analysed, and it is accompanied by the running count
+(`8 plies not evaluated yet.`) which disappears when it reaches zero. A review opened on a
+long game will show mostly open rings for a few seconds. That is correct, and it is far
+better than a track that fills in silently and lets the user believe the marks were there all
+along.
+
+**The wedge never appears from a partial comparison.** SPEC §3.1: the blunder flag never fires
+when either side of the before/after comparison is incomplete. In the track that means an open
+ring, never an optimistic dot and never a speculative wedge — a dot asserts "evaluated, clean",
+which is a claim, and an unevaluated ply has no business making it.
+
+Current ply: the tick becomes a full-height 3px `Frame` bar. That is the only current-ply
+marker; the track never scrolls under a fixed cursor, because a moving background is a second
+moving thing (§9).
+
+### 17.3 Honesty conventions inherited whole
+
+The review stepper is an analysis-derived surface and inherits every rule already governing
+one. Restated because a new surface that "survives a terminal position unchanged is a §3.2
+violation by definition, not a new discovery" (SPEC §3.2, 2026-07-29):
+
+- **Partial results are labelled.** A column whose analysis did not complete says
+  `Still solving this column.` — the existing string, the existing behaviour. It never shows a
+  stale number from an adjacent ply and never a guess.
+- **Terminal beats analysis.** At the final ply of a finished game the strip shows the outcome
+  in every cell (`Game over — you won.` / `— drawn.` / `— she won.`), the lamp is off, and the
+  winning four is drawn per §9's game-over row. The ply track's marks are backward-looking
+  provenance about specific past moves and are **exempt** — they remain true and remain
+  visible (SPEC §3.2 scope precision, 2026-07-29).
+- **The prediction block hides at a terminal position** — it makes a present-tense claim about
+  a move that is not going to happen. See §18.4.
+- **The blunder line uses §11's existing strings verbatim**, including
+  `Column 4 lasted four moves longer.` when the game was already lost. No new blunder copy.
+- **All wording passes through the single seat-translation point.** Four seats, four correct
+  outputs, on every string this surface produces.
+
+### 17.4 The lamp in review
+
+§9's states table gains one row. It is an extension, not an alteration — Play, Analyse and
+Setup behave exactly as §9 already specifies:
+
+| Mode / situation | Behaviour |
+|---|---|
+| Review (§17) | **Off until `Show me` is pressed**, as in Analyse. On for that ply only; stepping to any other ply clears it and `Show me` returns. |
+
+Review inherits Analyse's gate rather than Play's auto-reveal because review is the drill
+surface: the whole value of stepping through a lost game is the half-second of "what should I
+have played here?" before the answer arrives, and the ply track's wedges already do the
+teaching that §14.1's ruling credited the blunder flag with in Play. This is a default and one
+control's presence, nothing structural depends on it, and it is a one-line change if the owner
+rules the other way — the same terms on which §14.1's recommendation was made and overruled.
+
+### 17.5 Stepping and motion
+
+Single step forward plays the disc drop at §7's timing. Stepping back, jumping more than one
+ply, tapping the track, or scrubbing places discs instantly — a rewind animation would assert
+a physical event that never happened. Under `prefers-reduced-motion: reduce`, every step is
+instant and the lamp does not travel (§7, R10).
+
+Keyboard: `←` / `→` step, `Home` / `End` jump to first and last ply, `Escape` returns to the
+games sheet. The track itself is one focusable control with an accessible name naming the
+current ply and its evaluation state.
+
+---
+
+## 18. Opponent-model prediction display
+
+### 18.1 The two questions, made structural
+
+`docs/OPPONENT-MODEL.md` opens with the distinction this surface exists to protect: the solver
+answers *what is the best move*, the model answers *what will she actually play*. ROADMAP
+Phase 3 gate #2 requires the two to be **never conflated**. A gate criterion cannot rest on
+restraint, so conflation is prevented by construction, by five independent mechanisms — any
+one of which failing still leaves four standing:
+
+| # | Mechanism | Test |
+|---|---|---|
+| 1 | The lamp is the solver's, exclusively (R1) | Nothing model-derived sets a lit column, caret, inverted cell, or `wght 900` number |
+| 2 | The model never enters the board or the strip (R2) | DOM containment: no model value inside the board or verdict-strip components |
+| 3 | Vertical bars are the solver's; horizontal, at most three, are the model's (R3) | Axis and count |
+| 4 | The solver is raised `--c-n-0`, the model recessed `--c-n-2` (R4) | Ground colour and elevation |
+| 5 | The model never renders without the solver's answer beside it (R6) | The state "model alone on screen" does not exist |
+
+Mechanism 5 is the one that makes the gate hold rather than merely discourage. Conflation
+requires either fusion or solitude: 1–4 prevent fusion, 5 prevents solitude. A user reading
+the prediction block is always simultaneously looking at the verdict strip, on a different
+plane, on a different axis, in a different ink.
+
+And one more, in copy: **the two blocks are always headed by the questions they answer.**
+Whenever the prediction block is on screen, the strip above it carries a `--t-label` heading
+too. The pair reads:
+
+```
+THE POSITION            ← solver, raised, vertical, bare numerals
+WHAT ANNA MAY PLAY      ← model, recessed, horizontal, counts with denominators
+```
+
+The heading uses the opponent label (PIN 4: counts are keyed by label; the UI is
+single-opponent first). With no label it reads `WHAT SHE MAY PLAY`, per §11's pronoun rule.
+
+### 18.2 The prediction block — ready state
+
+```
+┌────────────────────────────────────────┐  --c-n-2 ground, no elevation,
+│ WHAT ANNA MAY PLAY                     │  1px --c-n-3 top edge, --r-md
+│                                        │
+│  4  ████████████░░░░░░░░░░░░  40%      │  --t-label column number,
+│  3  ███████░░░░░░░░░░░░░░░░░  25%      │  --c-n-7 fill on --c-n-3 track,
+│  6  ██████░░░░░░░░░░░░░░░░░░  20%      │  --t-micro figure, tabular
+│                                        │
+│  The other four columns share 15%.     │  --t-micro, --c-n-7
+│  From 22 of Anna's moves in positions  │  --t-micro, --c-n-7
+│  like this one.                        │
+└────────────────────────────────────────┘
+```
+
+Both trailing lines are `--c-n-7`, not `--c-n-5`: they sit on the recessed ground, where
+§15.4's rule puts the lightest permitted text ink at `--c-n-7`. They stay `--t-micro`, so they
+still read as subordinate to the figures above them — the demotion is carried by size, not by
+a lighter ink.
+
+- **Exactly three rows, always horizontal, never seven, never column-aligned** (R3).
+- Bars are static — no fill animation at any motion setting (R10).
+- Figures are **rounded to the nearest 5%**. The model's inputs are tens of games; a figure
+  reading `37%` claims a precision that does not exist. Rounding to 5 is a statement about
+  the evidence, not a rendering convenience.
+- **The remainder line is mandatory.** Three normalised shares out of seven legal moves do
+  not sum to 100, and a block that shows three bars adding to 85% with no explanation looks
+  broken or looks like the top three are the only candidates. The line says which.
+- **The evidence line is mandatory.** No block renders without the observation count the
+  model layer supplies. If that count is unavailable, the block does not render (R9).
+
+**Scope note on PIN 2.** PIN 2 bans displaying the posterior for *exploitation lines* and
+requires raw counts there. These share figures are a different quantity — a normalised share
+of the model's own scores across the legal moves in this position, not a rule's posterior mean
+— and are permitted here, labelled as what they are, and always paired with the raw evidence
+count beneath. The exploitation block (§18.6) shows no percentage at all.
+
+### 18.3 Honest confidence, including when it is low
+
+ROADMAP gate #3 requires confidence displayed honestly *including when it is low*. Low
+confidence is not a smaller bar. Three cases, each with its own designed state:
+
+**Close call** — the top three are within 10 points of each other:
+
+```
+│  4  ██████████░░░░░░░░░░░░░░  30%      │
+│  3  █████████░░░░░░░░░░░░░░░  25%      │
+│  6  ████████░░░░░░░░░░░░░░░░  25%      │
+│                                        │
+│  These three are close. Anna has no    │  --t-body, --c-n-9 — full body
+│  clear habit in positions like this.   │  weight, not a footnote
+```
+
+The sentence is `--t-body` in `--c-n-9`, larger and darker than the figures it qualifies,
+because the honest reading of this block is the sentence and not the ranking.
+
+**Thin evidence** — past the floor overall, but few observations at this position. The bars
+render and the evidence line is promoted to `--t-body` `--c-n-9`:
+`Only 4 of Anna's moves reached a position like this.`
+
+**No evidence here** — past the floor, nothing matching this position:
+
+```
+│ WHAT ANNA MAY PLAY                     │
+│ Nothing to go on here. None of Anna's  │  --t-body, --c-n-9
+│ 24 logged games reached a position     │
+│ like this one.                         │
+```
+
+No bars, no zero rows, no dashes. Three bars at 0% would be a fabricated ranking of nothing
+(R9).
+
+### 18.4 When the block does not render at all
+
+- The solver's answer for this position is unavailable or still running (R6).
+- The position is terminal — there is no move to predict. The prediction is a present-tense
+  claim and SPEC §3.2's class-wide rule applies to it in full.
+- It is the user's move, not the opponent's. The model predicts one person, the one it has
+  counts for. It never predicts the user.
+- Play mode and Analyse mode, always. Phase 3's shape is *log the game, review it afterwards,
+  drill the position where it was lost* — the trainer, not the oracle
+  (`docs/OPPONENT-MODEL.md`, "Reality check"). Keeping the model out of the two modes where
+  the lamp lives by default also means the highest-risk conflation surface never exists.
+
+### 18.5 The floor state — below 20 games
+
+**This is a first-class state, not an error state, and it is designed as one.** It occupies the
+same block, in the same place, on the same recessed ground, under the same heading as a ready
+prediction. Same shape, different content — because "the model is not ready" is a real answer
+to "what may she play", and dressing it as a failure teaches the user to dismiss it.
+
+```
+┌────────────────────────────────────────┐
+│ WHAT ANNA MAY PLAY                     │  --t-label — identical heading
+│                                        │
+│ Not yet. 14 games logged, 6 more       │  --t-body-lg, --c-n-9
+│ needed.                                │
+│                                        │
+│ ▪▪▪▪▪▪▪▪▪▪▪▪▪▪○○○○○○                   │  20 ticks: 14 filled --c-n-7,
+│                                        │  6 empty 1px --c-n-5 outline
+│ 11 live · 3 reconstructed              │  --t-micro, --c-n-7
+│                                        │
+│ Below 20 games the model would be      │  --t-body, --c-n-7
+│ guessing, and a guess shown            │
+│ confidently is worse than none.        │
+└────────────────────────────────────────┘
+```
+
+Design notes, each load-bearing:
+
+- **The reason sentence and the split line are `--c-n-7`, not `--c-n-5`** (§15.4). This block
+  sits on `--c-n-2`, and `--c-n-5` there is 4.44:1 — below AA for text of this size. The
+  reason sentence is the one thing in the floor state a user who wants predictions *now*
+  actually has to read, so it was the worst possible place in the amendment to have put
+  unreadable ink; it is also `--t-body` at 15px/400 and cannot be demoted into the large-text
+  exemption without making a hedge louder than the headline. It moves to `--c-n-7`.
+
+- **Twenty discrete ticks, not a progress bar.** The requirement is twenty countable games.
+  A percentage bar would turn a countable thing into an estimate and would invite the reader
+  to eyeball "nearly there" at 17. The ticks can be counted, and the count is the point.
+- **Both numbers are shown** — logged and needed — per `docs/OPPONENT-MODEL.md`: *show the
+  count and how many more are needed*. `needed` is rendered from what the model layer reports;
+  the design never computes it (§19.1).
+- **The live / reconstructed split is stated** even though the floor counts whole games
+  (§19.1). A user at 19 games of which 15 are reconstructed should be able to see that, since
+  it governs how good the model will be the moment it switches on.
+- **No warning voice, no dashed outline, no amber, no disabled styling.** §11's bans hold:
+  the string is not an error, is not phrased as one, and does not use the word.
+- **The reason is given in one sentence** — this is the tool's own thesis about itself, and
+  it is exactly the thing a user who wants predictions *now* needs to read.
+- **No prediction is shown anywhere while this state holds.** Not greyed out, not blurred, not
+  behind a "show anyway". The floor is a floor.
+
+### 18.6 Exploitation lines — raw counts, never posteriors
+
+The exploitable-weakness summary is *the actual product of Phase 3*
+(`docs/OPPONENT-MODEL.md`). It gets the largest type in this amendment.
+
+Appears at the head of the games sheet (§16.1) and at the foot of the review stepper. Grouped
+under two `--t-label` headings; a group with nothing to say is absent, not empty.
+
+```
+┌────────────────────────────────────────┐  --c-n-2 recessed ground
+│ WHERE ANNA IS WEAK                     │  --t-label
+│                                        │
+│ Anna missed a diagonal block in 7 of 9 │  --t-body-lg, --c-n-9
+│ chances.                               │
+│ Build diagonals.                       │  --t-body-strong, --c-n-9
+│ 6 live games · 3 reconstructed         │  --t-micro, --c-n-7
+│                                        │
+│ Anna answered a straight three in 8 of │
+│ 8 chances.                             │
+│ Threaten sideways only as a decoy.     │
+│ 8 live games                           │
+├────────────────────────────────────────┤
+│ WHERE ANNA IS STRONG                   │  --t-label
+│                                        │
+│ Anna answered an immediate four in 9   │
+│ of 9 chances.                          │
+│ Leaving one open will not work.        │
+│ 7 live games · 2 reconstructed         │
+└────────────────────────────────────────┘
+```
+
+**The display invariant, stated so it can be tested:** an exploitation line contains **exactly
+two integers, and they are the observation pair**. No third number, no `%` character, no
+decimal point anywhere in the block. That single rule makes PIN 2's ban structural — a
+posterior mean cannot be rendered as an integer pair, so a slip that reaches for the model's
+internal number cannot pass the check. `0.31` and `31%` both fail it on sight and in a test.
+
+**Fractional counts are forbidden.** PIN 3 halves reconstructed games in the *machinery*; the
+*display* is the raw observation pair, whole numbers, exactly as observed. `missed a diagonal
+in 7.5 of 9 chances` is not a sentence a person can act on. The weighting is disclosed instead
+by the mix line beneath (`6 live games · 3 reconstructed`), which states the composition of
+the same evidence honestly without pushing arithmetic into the reader's head. §19.2 records
+this as a called decision.
+
+The evidence-mix line under every one of these lines is `--t-micro` `--c-n-7` — this block is
+on the recessed ground and §15.4's rule applies to it as it does to §18.2 and §18.5.
+
+**Weakness and strength are separated by heading and words, never by hue or ornament.** No
+red for weak, no green for strong — §1 forbids it and §4's grayscale test would fail. The two
+groups are one heading apart.
+
+**Every line is three parts, always in this order:** the observation with its counts, the
+tactical consequence as an instruction, then the evidence mix. A line missing its consequence
+is not shown — an observation with no action attached is a statistic, and this tool does not
+show statistics.
+
+**R7 applies here too.** These lines describe chances taken and missed, not results. `answered
+an immediate four` rather than `took the win`; `Leaving one open will not work` rather than
+`she will win`. The model has no standing to make verdict claims — that is the solver's
+vocabulary and it stays with the solver.
+
+Exploitation lines are **backward-looking provenance** — they describe what happened in
+specific past games and remain true however any current game ends. Per SPEC §3.2's 2026-07-29
+scope precision they are exempt from terminal-beats-analysis and do not hide when the board's
+position is terminal.
+
+### 18.7 Copy — new strings
+
+All strings below pass §11's bans (`Score`, `eval`, `optimal`, `suboptimal`, `invalid`,
+`error`, `+6`, `-4`) and R7's verdict-word ban for model strings. `Anna` stands for the
+opponent label; with no label the pronoun rule in §11 applies and the label becomes `she`
+mid-sentence, `SHE` in headings.
+
+| Situation | String |
+|---|---|
+| Games sheet title | `GAMES` |
+| Games sheet subtitle, below floor | `14 logged · 6 more before predictions` |
+| Games sheet subtitle, above floor | `24 games logged` |
+| Log row, seat | `You were yellow · she moved first` |
+| Log row, result | `You won · 27 moves` / `She won · 19 moves` / `Drawn · 42 moves` |
+| Log row, provenance | `LIVE` / `RECONSTRUCTED · COUNTS HALF` |
+| Log row, no label | `Unlabelled` |
+| Log empty | `No games logged yet.` |
+| Log empty, second line | `Finish a game in Play and it is saved here. Or add one from memory.` |
+| Reconstruction, before saving | `This will be saved as reconstructed, and counts half as much as a game recorded live.` |
+| Review header, seat | `You were yellow. She moved first.` |
+| Review, ply context | `Ply 14 of 31 — her move.` / `— your move.` |
+| Review, unevaluated count | `8 plies not evaluated yet.` |
+| Prediction heading | `WHAT ANNA MAY PLAY` / `WHAT SHE MAY PLAY` |
+| Prediction, remainder | `The other four columns share 15%.` |
+| Prediction, evidence | `From 22 of Anna's moves in positions like this one.` |
+| Prediction, close call | `These three are close. Anna has no clear habit in positions like this.` |
+| Prediction, thin evidence | `Only 4 of Anna's moves reached a position like this.` |
+| Prediction, nothing matching | `Nothing to go on here. None of Anna's 24 logged games reached a position like this one.` |
+| Floor, headline | `Not yet. 14 games logged, 6 more needed.` |
+| Floor, split | `11 live · 3 reconstructed` |
+| Floor, reason | `Below 20 games the model would be guessing, and a guess shown confidently is worse than none.` |
+| Exploitation headings | `WHERE ANNA IS WEAK` / `WHERE ANNA IS STRONG` |
+| Exploitation, observation | `Anna missed a diagonal block in 7 of 9 chances.` |
+| Exploitation, consequence | `Build diagonals.` |
+| Exploitation, evidence mix | `6 live games · 3 reconstructed` |
+
+Never, in any model string: a percentage inside an exploitation line, a decimal, the word
+`probability`, `confidence` as a bare number without its evidence, or any of R7's verdict
+words.
+
+### 18.8 Accessibility
+
+- The prediction block is a labelled list; each row's accessible name is
+  `Column 4, 40 percent, from 22 of Anna's moves in positions like this one` — the evidence
+  travels with the figure, never separated from it.
+- The floor state's tick row is decorative and `aria-hidden`; its content is already in the
+  headline sentence, which is the accessible source of truth. A screen reader hears
+  `Not yet. 14 games logged, 6 more needed.` and never twenty list items.
+- Ply track ticks: the track is one control, its accessible name naming the current ply, whose
+  move it was, and its evaluation state including `not evaluated`.
+- Focus, hover and selection follow §10 and §9's quiet rule unchanged: 3px `Signal` outline,
+  1px `--c-n-3` ring, 2px `Signal` underline. Nothing in Phase 3 introduces a new interaction
+  treatment.
+
+---
+
+## 19. Decisions Phase 3 forced, and how I called them
+
+Same form as §14, which is unchanged. **There are six of them**, all recorded below; each is
+flagged because each is a real product decision the brief did not settle for me.
+
+**They are not equally cheap to reverse, and the earlier claim that they were was wrong.**
+Five — items 1, 2, 3, 4 and 6 — are genuinely cheap: each is a default, a string, or one
+control, and the reversal terms under each say exactly what changes. **Item 5 is not.** Putting
+the model into Play or Analyse would require R1–R6 to be re-derived for a screen where the
+solver's answer is already lit, which is a change of direction and a fresh anti-conflation
+argument, not a placement tweak. Item 5 states its own terms below and they are the expensive
+ones. Read the opener as: five reversible defaults and one directional call.
+
+1. **Does the 20-game floor count whole games or weighted games?** PIN 3 halves reconstructed
+   games in the model's counts; `docs/OPPONENT-MODEL.md` says *below 20 logged games*.
+   **Called: whole games — 20 rows in the log, whatever their provenance.** "How many more
+   games do I need to play?" must have a countable, checkable answer, and `you need 6 more, or
+   12 if you reconstruct them` is not one. The weighting stays where PIN 3 put it: inside the
+   rule counts, where it changes prediction quality rather than a target the user is working
+   toward. The floor's live/reconstructed split line (§18.5) discloses the composition either
+   way, so the surface does not lie under either ruling. **The design never computes `needed`
+   — it renders what the model layer reports**, so if Wave 14 is told to weight the floor, the
+   only change is that the split line's label must say so.
+
+2. **Fractional counts in exploitation lines.** PIN 2 requires raw counts; PIN 3's weighting
+   would produce `7.5 of 9`. **Called: display the whole-number observation pair, disclose the
+   mix beneath.** A count is evidence a person can check against their memory of the evening;
+   a weighted count is machinery wearing a count's clothes, and PIN 2 already ruled the
+   machinery internal. Flagged because it means the threshold that *fires* a line (PIN 2's
+   ≥ 6 observations) and the numbers *shown* may be computed on different scales — Wave 14
+   should pin the threshold to weighted observations for consistency with PIN 3, and the
+   display stays raw regardless.
+
+3. **The lamp in review: gated, as in Analyse.** §17.4 gives the reasoning. This is a default
+   and one control, nothing structural depends on it, and §14.1's precedent applies — if the
+   owner rules that review should auto-reveal like Play, that is a one-line change and this
+   document should record the ruling rather than be quietly patched.
+
+4. **The door is a text control, not a fourth mode.** §15.2. A fourth mode segment would
+   restyle §10 and would put a log of past games at the same level as the three things the
+   board does. `Games ▸` in the action slot costs one `--t-micro` control and no structural
+   change. **If the owner rules otherwise:** §10's three-equal-segments rule is rewritten to
+   four, §8.1–§8.4's wireframes are redrawn (§15.2 currently exempts them), §15.2 is replaced,
+   and the `Games ▸` control is deleted from the action slot. Nothing in §16, §17 or §18
+   changes — the sheet's content does not depend on its door — so the cost is confined to §10
+   and the four wireframes, and it is a redraw rather than a re-derivation.
+
+5. **The model does not appear in Play or Analyse.** §18.4. This follows the spec's own
+   "build the trainer, not the oracle", and it has the useful side effect of keeping the model
+   out of every screen where the lamp is on by default. If live prediction is ever sanctioned,
+   it is a change of direction for this surface — R1–R6 would need re-deriving for a screen
+   where the solver's answer is already lit — not a placement tweak.
+
+6. **Percentages rounded to the nearest 5, with the remainder stated.** §18.2. Both choices
+   are honesty about sample size rather than rendering taste, and both are the kind of thing
+   an implementer optimises away without a note. This is the note. **If the owner rules
+   otherwise:** the two halves reverse independently and at different prices. Unrounded
+   figures are a one-line change at the render point plus the strike of §18.2's rounding
+   bullet — no layout moves, because the figures are already tabular and two digits wide.
+   Dropping the remainder line is the more expensive half: §18.2's mandatory-remainder bullet
+   goes, and the block then shows three bars summing to 85% with nothing accounting for the
+   other 15%, which reads as broken or as "these are the only candidates". I would argue
+   against that half specifically; the rounding half I have no strong stake in.
+
+**Where I am exposed.** The prediction block is the least distinctive surface in this
+amendment — three horizontal bars is the most ordinary thing in the document, and §13 already
+confessed to the same weakness in the verdict strip. I chose ordinary deliberately here: the
+block's entire job is to be recognisably *not* the solver's answer, and an inventive treatment
+would compete with the strip above it for the reader's sense of "this is the important one".
+If it has to be revisited, the direction to push is making the model's block read as
+handwriting on the table — a written note about a person — rather than as a chart. I did not
+specify that now because it risks illegibility at `--t-micro` and because a second visual
+idiom is a second thing to get wrong at a gate that is about not conflating idioms.
+
+---
+
+**Changelog**
+
+- **2026-07-29 — Phase 3 amendment (design-lead, third and final bounded amendment).** Added
+  §15 (Phase 3 shared rules R1–R10, no new tokens, recessed-ground contrast), §16 (game log
+  list, with both provenance states labelled and the reconstructed discount stated in words),
+  §17 (post-game review stepper, ply track with an explicit not-evaluated state, honesty
+  conventions inherited whole from SPEC §3.1/§3.2), §18 (opponent-model prediction display:
+  five structural anti-conflation mechanisms per ROADMAP gate #2, honest-confidence states per
+  gate #3, the below-20 floor as a first-class designed state per gate #1, exploitation lines
+  as whole-number raw counts per PIN 2 with fractional counts forbidden per §19.2), and §19
+  (six decisions called, with reversal terms). §§1–14 unchanged; §12 tokens byte-identical.
+- **2026-07-29 — correction round on the Phase 3 amendment (design-lead), after a scope audit
+  rejected it on two findings.** *(1) §15.4's contrast table was wrong.* All four ratios were
+  inflated by roughly 8–10% — claimed 11.6 / 9.0 / 4.85 / 1.3, actually **10.63 / 8.25 / 4.44
+  / 1.20** on recompute with the standard WCAG relative-luminance formula (method checked
+  against black-on-white 21.0 and `#767676`-on-white 4.54). The table is corrected. The
+  material consequence was a real accessibility failure, not a rounding quibble: `--c-n-5` on
+  `--c-n-2` is 4.44:1, below the 4.5:1 AA threshold for normal-size text, and §15.4 had
+  labelled that exact pairing "the floor… pass" while §18.5 used it for the floor-reason body
+  sentence. Resolved without touching §12: **on `--c-n-2` no text is lighter than `--c-n-7`**,
+  at any size (`--t-micro` included — 11px is not large text). A sweep of §§15–18 found five
+  affected instances, all now `--c-n-7` — §18.2's remainder and evidence lines, §18.5's split
+  line and floor-reason sentence, §18.6's evidence-mix line. `--c-n-5` text on `--c-n-0` is
+  5.81:1 and was left alone. `--c-n-5` keeps the empty ticks, a non-text mark needing 3:1. The
+  cost — no lighter ink available for secondary rank on the recessed ground, so size and
+  weight carry it alone — is stated in §15.4 rather than hidden. *(2) §19's integrity.* The
+  run summary said "three things I had to call" while §19 recorded six; the six are correct
+  and all are kept, and §19 now says six in its opening line. The opener's blanket claim that
+  every decision was "cheap to reverse" was false and is corrected — item 5 says in its own
+  text that reversing it is a change of direction, so the opener now separates five reversible
+  defaults from one directional call. Items 4 and 6 had rationale but no reversal mechanic;
+  both now carry explicit "if the owner rules otherwise" terms in the form of items 1–3.
+  §§1–14 still unchanged; §12 tokens still byte-identical; no section renumbered.

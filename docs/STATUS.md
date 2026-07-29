@@ -17,8 +17,23 @@
   APPROVED by owner 2026-07-29** (plan of record below, incl. four pin
   rulings and the split gate). **Wave 12 is HELD until the owner reviews
   and approves the PIN 1 rule definitions** (drafted 2026-07-29, sent for
-  review). Design-lead one-shot for the three new surfaces: SANCTIONED,
-  launched headless (result recorded when verified). Phase 4 remains
+  review). Design-lead one-shot for the three new surfaces: DELIVERED +
+  ACCEPTED 2026-07-29 (headless Opus, model-verified via modelUsage both
+  rounds). DESIGN-DIRECTION §§15–19 added (shared rules; log list with
+  both provenance states labelled; review stepper with open-ring
+  not-evaluated marks; prediction display meeting gate #2 structurally —
+  the model cannot render without the solver beside it — with a testable
+  two-integers-no-percent invariant on exploitation lines; §19: five
+  reversible defaults + one directional call, all with reversal terms).
+  Scope audit REJECTED round 1 on two real findings — the §15.4 contrast
+  table was inflated ~8–10% (n-5-on-n-2 body text actually 4.44:1, BELOW
+  the 4.5:1 AA floor the doc claimed it passed) and §19's opener
+  overclaimed cheap reversal — correction round fixed both (five failing
+  text instances moved to n-7 ink; new rule: on n-2 no text lighter than
+  n-7 at any size; §12 untouched both rounds); re-audit ACCEPT with
+  independent recomputation. §19's six flagged decisions + the
+  raw-vs-weighted firing-threshold question are in front of the owner
+  with the PIN 1 review. Phase 4 remains
   unsanctioned.
 - **Wave 11 (immediate-win guard) COMPLETE, verifier PASS 7/7, DEPLOYED
   2026-07-29** (deploy run 30411030824 green, owner-ordered). Live-artifact

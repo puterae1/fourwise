@@ -23,9 +23,18 @@
   most informative move in the game). R4's ≥2 floor and D7's
   prior-strength-2 accepted, with D7 PINNED to the ≥6 threshold (if
   either moves, both move). Definitions amended into OPPONENT-MODEL.md
-  as a binding pin section. §19 rulings so far: floor counts whole
-  games (agreed); review inherits Analyse's Show-me gate (agreed);
-  items 4–6 with orchestrator recommendations in front of the owner.
+  as a binding pin section. §19 rulings COMPLETE 2026-07-29 — all six
+  accepted as the design-lead wrote them: (1) floor counts whole games;
+  (2) raw display / weighted firing threshold (via the D6 ruling);
+  (3) review inherits Analyse's Show-me gate ("review is studying, not
+  practising"); (4) Games is a text door, not a fourth mode ("the three
+  modes are ways of touching the board; the log is a records sheet at a
+  different altitude"); (5) the model never appears in Play or Analyse —
+  accepted AS DOCTRINE, not a default: gate #2 true by construction
+  rather than vigilance; any future live prediction returns as its own
+  proposal; (6) both halves — round to nearest 5, remainder line always
+  stated; if the rounding ever comes off, the remainder line stays.
+  DESIGN-DIRECTION §§15–19 stand as written, owner-ratified.
   **Wave 12 UNBLOCKED and delegated 2026-07-29.** Design-lead one-shot for the three new surfaces: DELIVERED +
   ACCEPTED 2026-07-29 (headless Opus, model-verified via modelUsage both
   rounds). DESIGN-DIRECTION §§15–19 added (shared rules; log list with

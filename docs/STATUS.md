@@ -430,6 +430,8 @@ before Wave 14 delegation:**
   game with evaluation at every ply, blunders verdict-only, wording
   through the single seat-translation point; design direction landed
   ahead of the wave (design-lead §§15–19, owner-ratified).
+  **DEPLOYED 2026-07-29: run 30447951636 green (owner-ordered publish);
+  live site 200, book.bin serving at 1,165,492 B.**
 - **Wave 14 — opponent model core, logic only** (`web-ui`, test-first):
   seven-rule classifier per the approved PIN 1 definitions (adversarial
   `blocks_diagonal` fixtures per the owner addition), Beta-Bernoulli

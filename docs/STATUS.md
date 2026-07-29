@@ -51,10 +51,13 @@
   positions — 20/20 exact vs gamesolver ground truth, all `complete:
   true`, the four pre-fix-wrong cells confirmed fixed on the live site;
   deployed book.bin hash-identical to the committed file.
-- **Release-fixtures CI re-dispatch on the Wave 11 engine: run
-  30407701466 — IN PROGRESS** (dispatched 2026-07-29 per the
-  engine-change precedent; result appended here, log-verified not
-  status-badge-verified, when it concludes).
+- **Release-fixtures CI on the Wave 11 engine: run 30407701466 —
+  SUCCESS, log-verified 2026-07-29** (not just the badge): bare-checkout
+  runner, `--include-ignored` full suite — lib 93/0 (417 s), gen_book
+  29/0, book_replay 3/0 incl. production replay (1,159 s), position
+  20/0, reference 8/8 with all six Pons sets exact (7,336 s). Zero
+  failures anywhere. Wave 11's exactness is now execution-verified on
+  current code both locally and on CI.
 
 ## Standing rules (operational — all still binding)
 

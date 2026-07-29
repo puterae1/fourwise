@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect 4 — the one reference</title>
+<style>
+/* ============================================================
+   Tokens — lifted verbatim from docs/DESIGN-DIRECTION.md §12.
+   No third-party fonts, no network requests. Archivo / Instrument
+   Sans are named per the direction; the system-ui fallback in the
+   stack is what actually renders unless those faces happen to be
+   installed locally — that is the intended, self-contained result.
+   ============================================================ */
+:root{
+  /* palette */
+  --c-kiln:        #E9ECEF;
+  --c-frame:       #232830;
+  --c-well:        #12161A;
+  --c-red:         #C42B21;
+  --c-yellow:      #F5B301;
+  --c-lamp-core:   #FFE7C2;
+  --c-lamp-rim:    #FF9F45;
+  --c-signal:      #0E5C6B;
+
+  --c-n-0: #F6F8F9;
+  --c-n-1: #E9ECEF;
+  --c-n-2: #D6DBE0;
+  --c-n-3: #C2C9D0;
+  --c-n-5: #5A626B;
+  --c-n-7: #333A43;
+  --c-n-9: #232830;
+
+  --c-page:   var(--c-kiln);
+  --c-surface:var(--c-n-0);
+  --c-ink:    var(--c-n-9);
+  --c-ink-muted: var(--c-n-5);
+  --c-focus:  var(--c-signal);
+  --c-marker-red:    rgba(255,255,255,.55);
+  --c-marker-yellow: rgba(0,0,0,.45);
+
+  /* type */
+  --f-display: "Archivo", system-ui, sans-serif;
+  --f-body:    "Instrument Sans", system-ui, -apple-system, sans-serif;
+
+  --t-display-size: 2.5rem;  --t-display-lh: 0.95;
+  --t-title-size:   1.25rem; --t-title-lh:   1.2;
+  --t-label-size:   0.8125rem;--t-label-lh:   1.2;
+  --t-body-lg-size: 1.0625rem;--t-body-lg-lh: 1.45;
+  --t-body-size:    0.9375rem;--t-body-lh:    1.5;
+  --t-micro-size:   0.6875rem;--t-micro-lh:   1.3;
+
+  /* space */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px; --sp-7:48px;
+  --gutter: var(--sp-3);
+  --parity-gutter: 22px;
+
+  /* shape */
+  --r-sm:8px; --r-md:14px; --r-lg:22px; --r-full:999px;
+
+  /* depth */
+  --el-board:  0 3px 0 #A9B2BA, 0 14px 28px -14px rgba(18,22,26,.55);
+  --el-raised: 0 2px 0 #CDD4DA;
+  --el-disc:   inset 0 3px 0 rgba(255,255,255,.30), inset 0 -3px 0 rgba(0,0,0,.28);
+
+  /* board metrics — computed with container query units against .wrap's
+     real content box (see container-type on .wrap below), not raw 100vw.
+     100vw can disagree with the actual layout width by the scrollbar's
+     width or by emulation quirks; cqw cannot, so the board can't overflow
+     its own container at any viewport size. Accounts for 6 grid gaps and
+     18px of board padding. */
+  --gap: 6px;
+  --cell: clamp(34px, calc((100cqw - 18px - 36px) / 7), 74px);
+  /* the trap-3 schematic additionally reserves the 22px parity ruler, the
+     9px gap beside it, and the schematic's own 32px of padding */
+  --cell-ruled: clamp(28px, calc((100cqw - 32px - 22px - 9px - 18px - 36px) / 7), 68px);
+
+  /* motion */
+  --dur-drop: 220ms; --ease-drop: cubic-bezier(.4,0,1,.6);
+  --dur-settle: 90ms;
+  --dur-ui: 120ms; --ease-ui: ease;
+}
+@media (min-width:900px){
+  :root{ --t-display-size: 3.25rem; --gutter: var(--sp-6); }
+}
+@media (prefers-reduced-motion: reduce){
+  :root{ --dur-drop:0ms; --dur-settle:0ms; --dur-ui:0ms; }
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--c-page);color:var(--c-ink);
+  font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding:0 var(--gutter) 72px;overflow-x:hidden}
+.wrap{max-width:560px;margin:0 auto;container-type:inline-size}
+a{color:var(--c-signal)}
+strong,b{font-weight:600}
+
+/* focus — never removed, always this shape (§10) */
+a:focus-visible,button:focus-visible,.tap:focus-visible{
+  outline:3px solid var(--c-focus);outline-offset:2px;border-radius:inherit}
+
+/* nav */
+nav{position:sticky;top:0;z-index:50;background:rgba(233,236,239,.94);backdrop-filter:blur(8px);
+    margin:0 calc(var(--gutter) * -1);padding:10px var(--gutter);border-bottom:1px solid var(--c-n-3);
+    display:flex;gap:4px}
+nav a{flex:1;min-width:0;text-align:center;text-decoration:none;color:var(--c-n-7);
+  font-family:var(--f-display);font-weight:700;font-stretch:100%;
+  font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;
+  padding:8px 1px;border:1px solid var(--c-n-3);border-radius:var(--r-sm);transition:var(--dur-ui) var(--ease-ui)}
+nav a:hover{color:var(--c-signal);border-color:var(--c-signal)}
+
+header{padding:28px 0 4px}
+.eyebrow{font-family:var(--f-display);font-weight:700;font-size:12px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--c-signal)}
+h1{font-family:var(--f-display);font-weight:800;font-stretch:110%;
+  font-size:clamp(2rem,10vw,var(--t-display-size));line-height:var(--t-display-lh);
+  letter-spacing:-.02em;text-transform:uppercase;color:var(--c-ink);margin:10px 0 12px}
+h1 em{font-style:normal;color:var(--c-signal)}
+.sub{color:var(--c-ink-muted);font-size:var(--t-body-lg-size);line-height:var(--t-body-lg-lh);max-width:42ch}
+.verified{display:inline-flex;align-items:center;gap:7px;margin-top:16px;
+  font-family:var(--f-body);font-weight:600;font-size:12px;color:var(--c-n-9);
+  border:1px solid var(--c-n-3);background:var(--c-n-0);
+  padding:7px 12px;border-radius:var(--r-sm);box-shadow:var(--el-raised)}
+
+section{padding-top:36px;scroll-margin-top:56px}
+.shead{font-family:var(--f-display);font-weight:700;font-size:12px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--c-signal);border-top:1px solid var(--c-n-3);padding-top:16px}
+h2{font-family:var(--f-display);font-weight:800;font-stretch:108%;text-transform:uppercase;
+  font-size:1.5rem;letter-spacing:-.01em;color:var(--c-ink);margin:6px 0 12px;line-height:1.05}
+h3{font-family:var(--f-display);font-weight:700;font-stretch:105%;text-transform:uppercase;
+  font-size:var(--t-title-size);color:var(--c-ink);margin:0 0 4px}
+.lede{color:var(--c-ink-muted);font-size:var(--t-body-lg-size);line-height:var(--t-body-lg-lh);
+  max-width:44ch;margin-bottom:22px}
+.lede b,.why b{color:var(--c-ink)}
+
+/* algorithm */
+.algo{counter-reset:s}
+.astep{display:grid;grid-template-columns:26px 1fr;gap:12px;padding:14px 0;border-top:1px solid var(--c-n-3)}
+.astep::before{counter-increment:s;content:counter(s);font-family:var(--f-display);font-weight:800;
+  font-size:13px;color:var(--c-signal);padding-top:3px}
+.astep p{font-size:var(--t-body-lg-size);font-weight:600}
+.astep small{display:block;color:var(--c-ink-muted);font-size:13.5px;font-weight:400;margin-top:3px;line-height:1.5}
+.astep .then{display:inline-block;font-family:var(--f-display);font-weight:700;font-size:11px;
+  letter-spacing:.03em;color:var(--c-n-0);background:var(--c-n-9);border-radius:var(--r-sm);
+  padding:3px 8px;margin-left:6px}
+.astep .then.no{color:var(--c-n-9);background:transparent;border:2px solid var(--c-n-9)}
+
+/* seat toggle */
+.seat{display:flex;gap:6px;margin:6px 0 10px;background:var(--c-n-0);
+  border:1px solid var(--c-n-3);border-radius:var(--r-full);padding:5px;box-shadow:var(--el-raised)}
+.seat button{flex:1;appearance:none;border:0;border-radius:var(--r-full);cursor:pointer;background:transparent;
+  color:var(--c-n-5);font-family:var(--f-display);font-weight:700;font-size:11.5px;letter-spacing:.03em;
+  padding:9px 4px;transition:var(--dur-ui) var(--ease-ui)}
+.seat button[aria-pressed="true"]{background:var(--c-n-9);color:var(--c-n-0)}
+.seatnote{font-size:13px;color:var(--c-ink-muted);line-height:1.6;margin-bottom:16px}
+.seatnote b{color:var(--c-ink)}
+.parity-verified{margin-bottom:20px}
+.parity-verified summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--c-signal);
+  list-style:none;display:inline-flex;align-items:center;gap:6px}
+.parity-verified summary::-webkit-details-marker{display:none}
+.parity-verified summary::before{content:"▸";display:inline-block;transition:var(--dur-ui) var(--ease-ui)}
+.parity-verified[open] summary::before{transform:rotate(90deg)}
+.parity-verified .pos-list{margin-top:10px;padding:12px 14px;background:var(--c-n-0);border:1px solid var(--c-n-3);
+  border-radius:var(--r-md);font-size:12px;color:var(--c-n-5);line-height:1.9;word-break:break-all}
+.parity-verified .pos-list b{color:var(--c-n-9);word-break:normal}
+
+/* board */
+.rig{display:flex;gap:9px;align-items:flex-end;margin-bottom:4px}
+.ruler{display:grid;grid-template-rows:repeat(6,var(--cell));gap:var(--gap);padding:9px 0}
+.rung{width:var(--parity-gutter);border-radius:5px;border:1px solid var(--c-n-3);display:flex;align-items:center;
+  justify-content:center;font-family:var(--f-body);font-weight:600;font-size:11px;color:var(--c-n-5);
+  transition:var(--dur-ui) var(--ease-ui);font-variant-numeric:tabular-nums}
+.rung.mine{border-color:var(--c-signal);color:var(--c-signal);background:rgba(14,92,107,.08)}
+.board{position:relative;background:var(--c-frame);border-radius:var(--r-lg);padding:9px;display:inline-block;
+  box-shadow:var(--el-board)}
+.grid{position:relative;z-index:1;display:grid;grid-template-columns:repeat(7,var(--cell));
+  grid-auto-rows:var(--cell);gap:var(--gap)}
+.cell{border-radius:50%;position:relative;background:var(--c-well);display:flex;align-items:center;
+  justify-content:center;box-shadow:inset 0 2px 5px rgba(0,0,0,.5)}
+.cell.hole{background:var(--c-well)}
+.disc{position:absolute;inset:0;border-radius:50%;box-shadow:var(--el-disc)}
+.disc.Y{background:var(--c-yellow)}
+.disc.R{background:var(--c-red)}
+.disc.Y::after{content:"";position:absolute;inset:36%;border-radius:50%;background:var(--c-marker-yellow)}
+.disc.R::after{content:"";position:absolute;inset:24%;border-radius:50%;
+  border:2px solid var(--c-marker-red)}
+.disc.drop{animation:drop var(--dur-drop) var(--ease-drop) both}
+@keyframes drop{from{transform:translateY(-280%)}to{transform:translateY(0)}}
+.mark{position:absolute;inset:0;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-family:var(--f-display);font-weight:700}
+.mark.her{border:2px dashed var(--c-red);color:var(--c-red);background:rgba(196,43,33,.10)}
+.mark.you{border:2px dashed var(--c-yellow);color:#8a6300;background:rgba(245,179,1,.14)}
+.mark.no{border:2px solid var(--c-n-7);color:var(--c-n-0);background:var(--c-n-7);font-size:19px}
+.arrows{display:grid;grid-template-columns:repeat(7,var(--cell));gap:var(--gap);height:22px}
+.arw{display:flex;align-items:center;justify-content:center;font-size:15px;color:transparent}
+.arw.on{color:var(--c-n-9);font-weight:700} .arw.bad{color:var(--c-n-9)}
+
+.card{margin-bottom:34px}
+.tag{font-family:var(--f-display);font-weight:700;font-size:11px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--c-n-5)}
+.cite{font-size:11px;color:var(--c-n-5);margin-top:8px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.raw{font-size:11px;color:var(--c-n-5);margin-top:6px;line-height:1.7;font-variant-numeric:tabular-nums}
+.verdict{display:inline-flex;gap:8px;margin-top:12px;font-family:var(--f-display);
+  font-size:12px;font-weight:700;letter-spacing:.03em;padding:9px 14px;border-radius:var(--r-sm)}
+.verdict.do{background:var(--c-n-9);color:var(--c-n-0)}
+.verdict.dont{background:transparent;border:2px solid var(--c-n-9);color:var(--c-n-9)}
+.why{color:var(--c-ink-muted);font-size:var(--t-body-size);line-height:var(--t-body-lh);margin-top:10px;max-width:44ch}
+.play{appearance:none;border:1px solid var(--c-n-9);background:transparent;color:var(--c-n-9);
+  font-family:var(--f-display);font-weight:700;font-size:12px;letter-spacing:.03em;padding:10px 16px;
+  border-radius:var(--r-sm);cursor:pointer;margin-top:12px;transition:var(--dur-ui) var(--ease-ui)}
+.play:hover{background:var(--c-n-9);color:var(--c-n-0)}
+.cap{font-size:13px;color:var(--c-ink-muted);margin-top:10px;min-height:2.6em;line-height:1.6}
+.cap b{color:var(--c-ink)}
+
+/* schematic */
+.schem{border:1px dashed var(--c-n-3);border-radius:var(--r-md);padding:16px;margin-top:6px;
+  --cell: var(--cell-ruled)}
+.schem .lbl{font-family:var(--f-display);font-weight:700;font-size:11px;color:var(--c-n-5);
+  letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
+.cols{display:flex;gap:5px;margin:14px 0 6px}
+.colbar{flex:1;height:38px;border-radius:var(--r-sm);border:1px solid var(--c-n-3);background:var(--c-n-0);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--f-body);font-weight:600;font-size:11px;color:var(--c-n-5)}
+.colbar.deadyou{border-color:var(--c-red);background:rgba(196,43,33,.08);color:var(--c-red)}
+.colbar.deadher{border-color:var(--c-yellow);background:rgba(245,179,1,.16);color:#8a6300}
+.tally{display:flex;gap:18px;font-size:12px;color:var(--c-ink-muted);margin-top:10px}
+.tally b{color:var(--c-ink)}
+
+/* drill */
+.taps{display:grid;grid-template-columns:repeat(7,var(--cell));gap:var(--gap);padding:0 9px;margin-bottom:6px}
+.tap{appearance:none;border:1px solid var(--c-n-3);background:var(--c-n-0);color:var(--c-n-7);border-radius:var(--r-sm);
+  height:36px;cursor:pointer;font-family:var(--f-display);font-weight:700;font-size:13px;
+  transition:var(--dur-ui) var(--ease-ui);font-variant-numeric:tabular-nums}
+.tap:hover:not(:disabled){border-color:var(--c-signal);color:var(--c-signal)}
+.tap:disabled{opacity:.4;cursor:default}
+.tap.right{background:var(--c-n-9);color:var(--c-n-0);border-color:var(--c-n-9)}
+.tap.wrong{background:transparent;color:var(--c-n-9);border:2px solid var(--c-n-9)}
+.fb{font-size:13px;margin-top:12px;min-height:3.4em;line-height:1.6;color:var(--c-ink-muted)}
+.fb b{color:var(--c-ink)}
+.score{font-family:var(--f-display);font-weight:700;font-size:12px;color:var(--c-ink-muted);margin-bottom:10px;
+  font-variant-numeric:tabular-nums}
+.legend{display:flex;gap:14px;margin-top:14px;font-size:11px;color:var(--c-n-5);flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:6px}
+.sw{width:11px;height:11px;border-radius:50%;display:inline-block}
+footer{margin-top:44px;border-top:1px solid var(--c-n-3);padding-top:18px;
+  font-size:12.5px;color:var(--c-n-5);line-height:1.8}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav>
+  <a href="#algo">ALGO</a><a href="#shapes">SHAPES</a><a href="#traps">TRAPS</a><a href="#drill">DRILL</a>
+</nav>
+
+<header>
+  <p class="eyebrow">Connect 4 · one reference</p>
+  <h1>Run the<br><em>algorithm.</em></h1>
+  <p class="sub">Six checks, four shapes, three traps, ten drills. Yellow is you, red is her. Nothing else matters.</p>
+  <span class="verified">✓ Verified against the fourwise engine (exact solver) — 2026-07-29</span>
+</header>
+
+<!-- ALGORITHM -->
+<section id="algo">
+  <p class="shead">The spine</p>
+  <h2>Every move, in this order</h2>
+  <p class="lede">Stop as soon as one fires. This <b>replaces</b> every other rule — the shapes and traps below are just instances of it.</p>
+  <div class="algo">
+    <div class="astep"><p>Can I win right now?<span class="then">PLAY IT</span><small>Check your own board before hers. People lose won games looking for danger.</small></p></div>
+    <div class="astep"><p>Can she win next move?<span class="then">BLOCK IT</span><small>Both ends of every row. All four diagonals. Every turn.</small></p></div>
+    <div class="astep"><p>Does my move let her win on top of it?<span class="then no">REJECT</span><small>Throw the move away and test the next candidate. This is the mistake costing you games.</small></p></div>
+    <div class="astep"><p>Can one move create <em>two</em> threats?<span class="then">PLAY IT</span><small>Game over. Parity is irrelevant here — she can only block one. Traps 1 and 2.</small></p></div>
+    <div class="astep"><p>Can I make one threat on my parity row she can't reach yet?<span class="then">PLAY IT, THEN GO QUIET</span><small>Fire once. Then stop attacking and let the clock run. Trap 3.</small></p></div>
+    <div class="astep"><p>Nothing else?<span class="then">SAFEST CENTRE MOVE</span><small>Closest to column 4 that opens nothing above it.</small></p></div>
+  </div>
+</section>
+
+<!-- SHAPES -->
+<section id="shapes">
+  <p class="shead">Recognition</p>
+  <h2>Four shapes on sight</h2>
+  <p class="lede">These cover steps 1–3. You should read them in under a second.</p>
+  <div id="patterns"></div>
+</section>
+
+<!-- TRAPS -->
+<section id="traps">
+  <p class="shead">Offence</p>
+  <h2>Three traps</h2>
+  <p class="lede">Steps 4 and 5. <b>Never build a three-in-a-row as a separate move</b> — she just blocks it and you've shown your hand. Build two-disc gaps; the three appears on the move that wins.</p>
+
+  <div class="seat" role="group" aria-label="Which seat this game">
+    <button id="btn-first" aria-pressed="true">I MOVE FIRST</button>
+    <button id="btn-second" aria-pressed="false">I MOVE SECOND</button>
+  </div>
+  <p class="seatnote" id="seatnote"></p>
+  <details class="parity-verified">
+    <summary>How the odd/even rule was verified</summary>
+    <div class="pos-list">
+      Four single-threat positions were built and solved to check every combination of seat and parity:<br>
+      <b>First + odd row</b> → first player wins — pos <span style="word-break:break-all">6771747536361445224432432336555151226611</span><br>
+      <b>First + even row</b> → draw — pos <span style="word-break:break-all">757374215163542441451121354533366226662</span><br>
+      <b>Second + even row</b> → second player wins — pos <span style="word-break:break-all">176717225212243632546654654333345651141</span><br>
+      <b>Second + odd row</b> → draw — pos <span style="word-break:break-all">7727372661616343164126443555323225415541</span><br>
+      All four came back exactly as the rule predicts, and all four were certified single-threat by a board-wide scan of both sides' winning cells. It only governs a single, isolated waiting threat (SPEC §2) — a double threat (Traps 1 and 2) wins whoever's turn it is, parity doesn't enter into it.
+    </div>
+  </details>
+
+  <div id="trapcards"></div>
+
+  <!-- trap 3 schematic -->
+  <div class="card">
+    <p class="tag">Trap 03 — the wait</p>
+    <h3>One threat, then silence</h3>
+    <div class="schem">
+      <p class="lbl">Schematic — not a real position, illustrative only</p>
+      <div class="rig">
+        <div class="ruler" id="ruler-z"></div>
+        <div class="board"><div class="grid" id="board-z"></div></div>
+      </div>
+      <div class="cols" id="colbars"></div>
+      <div class="tally">
+        <span>safe columns · you <b id="tYou">4</b></span>
+        <span>her <b id="tHer">4</b></span>
+      </div>
+    </div>
+    <span class="verdict do">✓ SHE RUNS OUT FIRST</span>
+    <p class="why">Your threat sits on a row she can't reach yet. Her threat does too. Both columns are now dead to whoever would feed the other. Play safe, neutral moves. The board fills, her options vanish, and she is <b>forced</b> to play under yours.<br><br>This is exactly what she has been doing to you. The only difference is she started the clock first. This diagram is schematic — it exists to show the shape, not to stand in for a solved board; see the parity note above for the actual verified rule.</p>
+  </div>
+</section>
+
+<!-- DRILL -->
+<section id="drill">
+  <p class="shead">Practice</p>
+  <h2>Your move</h2>
+  <p class="score" id="score">0 / 0</p>
+  <p class="lede" id="prompt" style="margin-bottom:6px">Which column do you play?</p>
+  <p class="cite" id="drillCite" style="margin:0 0 12px"></p>
+  <div class="taps" id="taps"></div>
+  <div class="board"><div class="grid" id="drillGrid"></div></div>
+  <p class="fb" id="feedback">Tap a column number above.</p>
+  <p class="raw" id="drillRaw"></p>
+  <button class="play" id="nextBtn" style="display:none">NEXT →</button>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--c-yellow)"></i>you</span>
+    <span><i class="sw" style="background:var(--c-red)"></i>her</span>
+    <span>◎ winning square</span>
+  </div>
+</section>
+
+<footer>
+  Centre opening → first player wins.<br>
+  Next to centre → draw.<br>
+  Outer four columns → second player wins.<br><br>
+  If she ever opens on an edge, the game is already yours.<br><br>
+  Verified from the empty board, full-depth solve, 2026-07-29 — column scores (first player to move):
+  1:−2 2:−1 3:0 4:+1 5:0 6:−1 7:−2.
+</footer>
+</div>
+
+<script>
+const COLS=7,ROWS=6;
+const P=a=>a.map(r=>r.split(""));
+const DISC=c=>c==="Y"||c==="R";
+const scoreline=arr=>arr.map((v,i)=>(i+1)+":"+(v>0?"+":v<0?"−":"")+Math.abs(v)).join("  ");
+const cite=pos=>pos?'<p class="cite">pos '+pos+' — paste into fourwise Setup or gamesolver.org</p>'
+                  :'<p class="cite">empty board — the game\'s starting position</p>';
+
+function cellEl(ch){
+  const c=document.createElement("div");c.className="cell";
+  if(DISC(ch)){const d=document.createElement("div");d.className="disc "+ch;c.appendChild(d);}
+  else{
+    c.classList.add("hole");
+    if(ch==="w")c.innerHTML='<span class="mark her">◎</span>';
+    else if(ch==="y")c.innerHTML='<span class="mark you">◎</span>';
+    else if(ch==="x")c.innerHTML='<span class="mark no">✕</span>';
+  }
+  return c;
+}
+function fill(g,spec){g.innerHTML="";for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)g.appendChild(cellEl(spec?spec[r][c]:"."));}
+function makeBoard(spec,arrows){
+  const b=document.createElement("div");b.className="board";
+  if(arrows){
+    const a=document.createElement("div");a.className="arrows";
+    for(let i=0;i<COLS;i++){const k=arrows[i]||"";a.innerHTML+='<div class="arw '+k+'">'+(k==="bad"?"✕":"▲")+'</div>';}
+    b.appendChild(a);
+  }
+  const g=document.createElement("div");g.className="grid";b.appendChild(g);fill(g,spec);
+  return b;
+}
+
+/* ---------- SHAPES ---------- */
+const SHAPES=[
+{tag:"Shape 01 — the opening",title:"Take the middle",pos:null,
+ board:P([".......",".......",".......",".......",".......","......."]),arrows:{3:"on"},
+ v:["do","▲ COLUMN 4"],
+ why:"Every game, no exceptions — and it's closer than it looks: with perfect play from both sides the result isn't decided until your 21st disc goes down, the narrowest first-move win there is. The centre column's two middle cells each sit on 13 possible fours (row by row, bottom to top, the seven columns' cells sit on 7, 10, 13, 13, 10, 7 lines); a corner cell sits on only 3. There are 69 winning lines on the whole board.",
+ cols:[-2,-1,0,1,0,-1,-2]},
+{tag:"Shape 02 — the poison",title:"Her three with a gap above",pos:"1323254475",
+ board:P([".......",".......",".......",".......",".YRRRw.","YYRYRxY"]),arrows:{5:"bad"},
+ v:["dont","✕ NEVER COLUMN 6"],
+ why:"Her winning square is column 6 row 2 — not reachable yet. Drop into column 6 and she lands on top. <b>That column is dead to you for the rest of the game.</b> Be honest about the rest of the board, though: this position is razor-thin. Only column 2 actually wins from here, and even that takes 29 more moves. Every other column loses too, eventually — column 6 just loses on the spot instead of slowly.",
+ cols:[-13,2,-4,-5,-5,-16,-13]},
+{tag:"Shape 03 — the sneak",title:"The diagonal you don't see",pos:"233454554",
+ board:P([".......",".......","....w..","...RY..","..RYR..",".RYYR.."]),arrows:{4:"on"},
+ v:["do","▲ BLOCK COLUMN 5 NOW"],
+ why:"Three red climbing left to right. The winning square is already supported — she wins next move. Scan diagonals every turn; this is the one people miss. And this block is worth more than survival: play it and you're winning, 31 moves from here. Every alternative loses almost immediately.",
+ cols:[-16,-16,-16,-16,2,-16,-16]},
+{tag:"Shape 04 — how you win",title:"Two open ends",pos:"1323446575",
+ board:P([".......",".......",".......",".......",".yYYYy.","RRYRYRR"]),arrows:{1:"on",5:"on"},
+ v:["do","✓ SHE CAN'T BLOCK BOTH"],
+ why:"Three across with a landing square open at <b>each</b> end. She blocks one, you take the other. This isn't a rule of thumb here — it's proven for this exact board: every one of her seven legal replies hands you an immediate win at column 2 or column 6.",
+ cols:[-16,-16,-16,-16,-16,-16,-16]}
+];
+
+SHAPES.forEach(p=>{
+  const s=document.createElement("div");s.className="card";
+  s.innerHTML='<p class="tag">'+p.tag+'</p><h3>'+p.title+'</h3>';
+  s.appendChild(makeBoard(p.board,p.arrows));
+  s.insertAdjacentHTML("beforeend",cite(p.pos));
+  s.insertAdjacentHTML("beforeend",
+    '<div><span class="verdict '+p.v[0]+'">'+p.v[1]+'</span></div><p class="why">'+p.why+'</p>'+
+    '<p class="raw">columns (this side to move): '+scoreline(p.cols)+'</p>');
+  document.getElementById("patterns").appendChild(s);
+});
+
+/* ---------- TRAPS 1 & 2 ---------- */
+const TRAP1=P([".......",".......",".......",".......",".......","R.Y.Y.R"]);
+const TRAP2=P([".......",".......",".....y.","..YYYy.","..RYRR.","..YRRY."]);
+
+const tc=document.getElementById("trapcards");
+
+/* trap 1 with play-out */
+const c1=document.createElement("div");c1.className="card";
+c1.innerHTML='<p class="tag">Trap 01 — the split</p><h3>Two discs, one gap</h3>';
+const b1=makeBoard(TRAP1,{3:"on"});c1.appendChild(b1);
+c1.insertAdjacentHTML("beforeend",cite("3157"));
+c1.insertAdjacentHTML("beforeend",
+ '<div><span class="verdict do">✓ COLUMN 4 FORKS AT 2 AND 6</span></div>'+
+ '<p class="why">Two yellows on the bottom row with a gap. Looks like nothing. Play column 4 → three across, open at column 2 <b>and</b> column 6, both instantly playable because the bottom row needs no support. It is also the fastest win on the board from here — three more moves and it\'s over. Columns 3 and 5 win too, just slower; columns 2 and 6 slower again; columns 1 and 7 only draw. Column 4 is the one to actually play.<br><br>Set it early and casually while she is busy with her own cluster.</p>'+
+ '<p class="raw">columns (your move): '+scoreline([0,2,4,18,4,2,0])+'</p>'+
+ '<button class="play" id="t1btn">▶ PLAY IT OUT</button><p class="cap" id="t1cap">Your move. Nothing on the board looks dangerous.</p>');
+tc.appendChild(c1);
+
+/* trap 2 */
+const c2=document.createElement("div");c2.className="card";
+c2.innerHTML='<p class="tag">Trap 02 — the stack</p><h3>Two wins in one column</h3>';
+const b2=makeBoard(TRAP2,{5:"on"});c2.appendChild(b2);
+c2.insertAdjacentHTML("beforeend",cite("33344545665"));
+c2.insertAdjacentHTML("beforeend",
+ '<div><span class="verdict do">✓ NO RED MOVE STOPS THIS</span></div>'+
+ '<p class="why">Your winning squares sit directly on top of each other in column 6 — a horizontal on row 3, a diagonal on row 4. <b>Blocking the lower one physically raises the column to the upper one.</b> The block <em>is</em> the loss. Every one of her seven legal replies scores an identical forced loss for her.<br><br>Build it by crossing two different lines through one column. She sees one and thinks she has handled it.</p>'+
+ '<p class="raw">her columns (her move, all identical): '+scoreline([-15,-15,-15,-15,-15,-15,-15])+'</p>'+
+ '<button class="play" id="t2btn">▶ PLAY IT OUT</button><p class="cap" id="t2cap">Her move. She has to deal with column 6.</p>');
+tc.appendChild(c2);
+
+/* play-outs */
+function seq(gridEl,base,moves,capEl,btn,lines){
+  let i=0;
+  btn.onclick=()=>{
+    if(i<moves.length){
+      const spec=JSON.parse(JSON.stringify(base));
+      for(let k=0;k<=i;k++){const[c,who]=moves[k];
+        for(let r=ROWS-1;r>=0;r--){if(!DISC(spec[r][c])){spec[r][c]=who;break;}}}
+      fill(gridEl,spec);
+      const last=moves[i][0];
+      for(let r=0;r<ROWS;r++){const d=gridEl.children[r*COLS+last].querySelector(".disc");
+        if(d&&spec[r][last]===moves[i][1]){d.classList.add("drop");break;}}
+      capEl.innerHTML=lines[i];i++;
+      btn.textContent=i<moves.length?"▶ NEXT MOVE":"↺ RESET";
+    }else{fill(gridEl,base);
+      i=0;btn.textContent="▶ PLAY IT OUT";capEl.innerHTML=capEl.dataset.init;}
+  };
+}
+const t1cap=document.getElementById("t1cap");t1cap.dataset.init=t1cap.innerHTML;
+seq(b1.querySelector(".grid"),TRAP1,[[3,"Y"],[1,"R"],[5,"Y"]],t1cap,document.getElementById("t1btn"),
+ ["Three across. Both ends open and playable — she is already lost.",
+  "She blocks column 2. It was that or column 6. Either way, one.",
+  "Column 6. Four across on the bottom row."]);
+const t2cap=document.getElementById("t2cap");t2cap.dataset.init=t2cap.innerHTML;
+seq(b2.querySelector(".grid"),TRAP2,[[5,"R"],[5,"Y"]],t2cap,document.getElementById("t2btn"),
+ ["She blocks row 3 — the only square that stops the horizontal. And in doing so she lifts the column.",
+  "Column 6, row 4. The diagonal completes. Her block built your win."]);
+
+/* ---------- parity ---------- */
+function makeRuler(id){const el=document.getElementById(id);
+  for(let r=ROWS;r>=1;r--){const d=document.createElement("div");d.className="rung";d.dataset.row=r;d.textContent=r;el.appendChild(d);}}
+makeRuler("ruler-z");
+fill(document.getElementById("board-z"),P([".......",".......",".....w.",".y.....",".......","......."]));
+const bars=document.getElementById("colbars");
+for(let c=1;c<=COLS;c++){const d=document.createElement("div");d.className="colbar";
+  d.textContent=c;if(c===6)d.classList.add("deadyou");if(c===2)d.classList.add("deadher");bars.appendChild(d);}
+
+let first=true;
+const bF=document.getElementById("btn-first"),bS=document.getElementById("btn-second"),
+      note=document.getElementById("seatnote");
+function seat(){
+  bF.setAttribute("aria-pressed",first);bS.setAttribute("aria-pressed",!first);
+  const mine=first?[1,3,5]:[2,4,6];
+  document.querySelectorAll(".rung").forEach(r=>r.classList.toggle("mine",mine.includes(+r.dataset.row)));
+  note.innerHTML=first
+   ?"This game your rows are <b>1, 3, 5</b>. A single waiting threat only pays off on an odd row. Double threats (Traps 1 &amp; 2) ignore this entirely."
+   :"This game your rows are <b>2, 4, 6</b>. A single waiting threat only pays off on an even row. Double threats (Traps 1 &amp; 2) ignore this entirely.";
+}
+bF.onclick=()=>{first=true;seat()};bS.onclick=()=>{first=false;seat()};seat();
+
+/* ---------- DRILL ---------- */
+const DRILLS=[
+{board:P([".......",".......",".......",".......",".......","YRRR.YY"]),ans:5,pos:"126374",
+ cols:[-18,-18,-18,-18,-3,-18,-18],
+ prompt:"Which column do you play?",
+ right:"Column 5 was still the safest column — but be clear about what it does: this position is already lost, whatever you play. Blocking there just makes her earn it, about 30 more moves instead of an immediate finish. Every other column loses on the spot.",
+ wrong:"Red has three at columns 2–4. Column 1 is already blocked, so column 5 was the least-bad move — check <b>both</b> ends. But even that doesn't save the game: this position is lost either way. Column 5 just makes her work another 30-odd moves for it; anywhere else and she finishes immediately."},
+{board:P([".......",".......","....w..","...RY..","..RYR..",".RYYR.."]),ans:5,pos:"233454554",
+ cols:[-16,-16,-16,-16,2,-16,-16],
+ prompt:"Red is climbing. Which column?",
+ right:"You saw the diagonal — and that block does more than survive it. This position is winning for you, 31 moves out. Every other reply loses almost immediately.",
+ wrong:"Red runs diagonally from column 2 up to column 4, and the winning square at column 5 is already supported. <b>Diagonals count.</b> Take that block and you're not just safe — you're winning, 31 moves out."},
+{board:P([".......",".......","..y....","..Y....","..Y....","RRYRR.."]),ans:3,pos:"1323435",
+ cols:[4,16,18,16,3,5,4],
+ prompt:"Nothing threatens you. Which column?",
+ right:"Three yellow stacked — column 3 finishes it right now. Every column here actually wins eventually, but column 3 is the only immediate one. Step 1 of the algorithm: always check your own board first.",
+ wrong:"You had three stacked in column 3 — that was the immediate win. Every legal column wins from this position eventually, but column 3 wins on the spot; nothing else comes close for speed."},
+{board:P([".......",".......",".......",".......",".......","R.Y.Y.R"]),ans:4,pos:"3157",
+ cols:[0,2,4,18,4,2,0],
+ prompt:"No threats anywhere. Which column?",
+ right:"Column 4 gives three across with both ends open. That's Trap 1 — she can't block both — and it's also the fastest win on the board from here: three moves and it's done.",
+ wrong:"Column 4 fills the gap between your two discs, opening landing squares at columns 2 <b>and</b> 6. That's the fork, and it wins fastest of anything available — three more moves."},
+{board:P([".......",".......",".......",".......",".YRRRw.","YYRYR.Y"]),ans:6,avoid:true,pos:"1323254475",
+ cols:[-13,2,-4,-5,-5,-16,-13],
+ prompt:"Which column must you NOT play?",
+ right:"Column 6. Her three on row 2 needs column 6 row 2, and dropping there puts you directly underneath it. For the record: only column 2 actually wins for you here, and it takes 29 more moves — everything else loses eventually too. Column 6 just loses immediately instead of slowly.",
+ wrong:"Column 6 was the one to avoid. Her three on row 2 needs column 6 row 2, and a drop there hands it straight to her. This position was never easy — only column 2 wins, 29 moves out — but column 6 is the one that loses <b>instantly</b>."},
+{board:P([".......",".......","..Y....","..R..Y.",".RR.RYR","RYRYYYR"]),ans:6,pos:"353676321354762",
+ cols:[-13,-13,-13,0,-13,14,-13],
+ prompt:"You're two moves from a draw and a win. Which column?",
+ right:"Column 6 stacks a fourth yellow on top of three already sitting there — a vertical win, right now. Column 4 only draws. Everything else loses. Don't settle for the safe-looking draw when the win is sitting in the same column you've already been building.",
+ wrong:"Three yellows are already stacked in column 6 — the fourth one wins immediately. Column 4 only draws. Check your own tall columns before you look anywhere else; a vertical four is the easiest win to miss because it doesn't look like a \"line\"."},
+{board:P([".......",".......",".......","..R....","..R....","RYYY.YR"]),ans:5,pos:"31472363",
+ cols:[-2,-2,4,0,17,-2,-2],
+ prompt:"Nothing looks urgent. Which column?",
+ right:"Column 5 completes four straight across the bottom row — the win was already sitting there. Column 4 only draws; column 3 also wins, just much slower. Scan the whole row, not just the disc you last placed.",
+ wrong:"Column 5 finishes four across the bottom row for an immediate win. Column 4 merely draws. It's an easy one to miss because the winning square is at the far end of a row you built slowly."},
+{board:P([".......",".......",".......",".Y.....",".Y.....",".RY.RRR"]),ans:4,pos:"2372526",
+ cols:[-17,-17,-17,3,-17,-17,-17],
+ prompt:"She's one move from finishing you almost everywhere. Which column keeps you alive?",
+ right:"Column 4 is the only square that doesn't lose almost immediately. It isn't flashy — it just survives. One narrow, unglamorous move is sometimes the whole game.",
+ wrong:"Column 4 was the only column that didn't lose within a move or two. When nothing looks good, look for the one quiet square that isn't actually losing — it doesn't have to look like progress."},
+{board:P([".......",".......",".....R.",".....R.","R..Y.Y.","YY.Y.RR"]),ans:3,pos:"1746662146",
+ cols:[5,5,16,15,14,5,5],
+ prompt:"Every column here wins. Which is fastest?",
+ right:"Column 3 wins fastest of all seven legal replies. When everything wins, speed is the only thing left to optimise — don't hand her extra moves to find a trick.",
+ wrong:"Every column actually wins from here — but column 3 wins fastest. Once you know you're winning everywhere, stop looking for \"a\" win and look for the quickest one."},
+{board:P([".......",".......","...Y...","...YR..","..YRRR.","Y.RYYRR"]),ans:7,pos:"6435735144645",
+ cols:[-14,-14,-14,-14,-14,-14,3],
+ prompt:"One quiet column survives here. Which one?",
+ right:"Column 7 is distant and unglamorous, but it's the only move that doesn't lose almost immediately. A quiet, faraway win counts exactly the same as a loud one in the middle of the board.",
+ wrong:"Column 7 was the only non-losing move — everything else loses almost immediately. The winning (or in this case, saving) square doesn't have to be anywhere near where the action looks like it's happening."}
+];
+
+let qi=0,score=0,asked=0,locked=false;
+const taps=document.getElementById("taps"),dg=document.getElementById("drillGrid"),
+      fb=document.getElementById("feedback"),nb=document.getElementById("nextBtn"),
+      sc=document.getElementById("score"),pr=document.getElementById("prompt"),
+      dc=document.getElementById("drillCite"),dr=document.getElementById("drillRaw");
+for(let c=1;c<=COLS;c++){const b=document.createElement("button");
+  b.className="tap";b.textContent=c;b.onclick=()=>answer(c,b);taps.appendChild(b);}
+
+function loadQ(){const q=DRILLS[qi];locked=false;fill(dg,q.board);pr.textContent=q.prompt;
+  dc.innerHTML=cite(q.pos);dr.textContent="";
+  fb.innerHTML="Tap a column number above.";nb.style.display="none";
+  [...taps.children].forEach(b=>{b.className="tap";b.disabled=false;b.textContent=b.dataset.col||b.textContent});
+  sc.textContent=score+" / "+asked;}
+
+function answer(col,btn){
+  if(locked)return;locked=true;asked++;
+  const q=DRILLS[qi],ok=col===q.ans;
+  if(ok)score++;
+  btn.classList.add(ok?"right":"wrong");
+  btn.innerHTML=col+" "+(ok?"✓":"✕");
+  if(!ok){const rb=taps.children[q.ans-1];rb.classList.add("right");rb.innerHTML=q.ans+" ✓";}
+  [...taps.children].forEach(b=>b.disabled=true);
+  if(!q.avoid){
+    const spec=JSON.parse(JSON.stringify(q.board)),c=q.ans-1;
+    for(let r=ROWS-1;r>=0;r--){if(!DISC(spec[r][c])){spec[r][c]="Y";break;}}
+    fill(dg,spec);
+    for(let r=0;r<ROWS;r++){if(spec[r][c]==="Y"){const d=dg.children[r*COLS+c].querySelector(".disc");
+      if(d)d.classList.add("drop");break;}}
+  }
+  fb.innerHTML=(ok?"✓ ":"✕ ")+(ok?q.right:q.wrong);
+  if(q.cols)dr.textContent="columns (your move): "+scoreline(q.cols);
+  sc.textContent=score+" / "+asked;
+  nb.style.display="inline-block";
+  nb.textContent=qi<DRILLS.length-1?"NEXT →":"↺ AGAIN";
+}
+nb.onclick=()=>{if(qi<DRILLS.length-1)qi++;else{qi=0;score=0;asked=0}loadQ()};
+loadQ();
+</script>
+</body>
+</html>

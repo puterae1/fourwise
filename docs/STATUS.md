@@ -301,6 +301,29 @@ pre-signature pass 6/6 with live screenshots; deployed (run 30398241459).
   tests, debug 147/0 + clippy clean, FULL release run 0 failures (six Pons
   sets exact), web 310/310 on a rebuilt pkg it caught stale itself.
 
+- **Strategy trainer (owner side task, 2026-07-29) — COMPLETE, committed.**
+  `docs/strategy/connect4-master.html` (hand-written pre-project, checked
+  only by a throwaway Python script) revised against the real engine.
+  Owner's verification verdict: ALL original claims survived — 7 clean, 3
+  held-with-correction (the "13 fours" cell/column precision; Shape 02's
+  only-column-2-actually-wins picture; Drill 1's blocking-is-damage-
+  limitation truth, now stated per §3.2). Parity odd/even rule VERIFIED by
+  four constructed positions, each certified single-threat by a
+  board-wide both-sides threat census (a first construction attempt had a
+  gravity-gated census bug that hid a stacked second threat — caught by
+  the independent re-verifier, root-caused, rebuilt). Rewrite: every
+  assertion now a scored statement from the reader's seat; §12 tokens
+  verbatim at every breakpoint (two token rounds — three mobile values +
+  the 900px display size); Google Fonts removed (self-contained, zero
+  network requests, CDP-verified); five new engine-mined drills (6–10)
+  with position-string citations; badge now truthfully states engine
+  verification with date. Three verification layers, all independent:
+  claim verification (rust-engine, scratchpad path-dep binary), rewrite
+  self-check, and a final verifier that re-solved every position in the
+  page from scratch incl. the seven empty-board columns — final verdict
+  PASS on all seven criteria after two patch rounds. Zero repo footprint
+  outside the single HTML file.
+
 ## Phase plans
 
 - **Phase 1 wave plan:** complete, gate signed (record above).

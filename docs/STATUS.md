@@ -15,9 +15,18 @@
 
 - **Phase 2 CLOSED** (gate SIGNED 2026-07-29). **Phase 3 wave plan
   APPROVED by owner 2026-07-29** (plan of record below, incl. four pin
-  rulings and the split gate). **Wave 12 is HELD until the owner reviews
-  and approves the PIN 1 rule definitions** (drafted 2026-07-29, sent for
-  review). Design-lead one-shot for the three new surfaces: DELIVERED +
+  rulings and the split gate). **PIN 1 APPROVED 2026-07-29** with one
+  reversal (D6: exploitation threshold fires on WEIGHTED ≥ 6, display
+  raw — design-lead was right, the draft was wrong; consequence
+  documented in the doc) and one refinement (D3: takes_win exclusivity
+  only on a TAKEN win; a missed win observes all applicable rules — the
+  most informative move in the game). R4's ≥2 floor and D7's
+  prior-strength-2 accepted, with D7 PINNED to the ≥6 threshold (if
+  either moves, both move). Definitions amended into OPPONENT-MODEL.md
+  as a binding pin section. §19 rulings so far: floor counts whole
+  games (agreed); review inherits Analyse's Show-me gate (agreed);
+  items 4–6 with orchestrator recommendations in front of the owner.
+  **Wave 12 UNBLOCKED and delegated 2026-07-29.** Design-lead one-shot for the three new surfaces: DELIVERED +
   ACCEPTED 2026-07-29 (headless Opus, model-verified via modelUsage both
   rounds). DESIGN-DIRECTION §§15–19 added (shared rules; log list with
   both provenance states labelled; review stepper with open-ring

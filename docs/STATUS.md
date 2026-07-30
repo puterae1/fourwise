@@ -470,12 +470,23 @@ before Wave 14 delegation:**
     re-derived the fixture board by hand): "making it longer" =
     resulting connected run strictly longer than L, implemented as
     neighbour-sum ≥ L; an == reading contradicts the committed
-    oracle. OWNER RULING PENDING on the R4 pin addendum: the
-    untested bridge case (a move joining two sub-L runs whose
-    combination reaches L, neither side alone being the length-L
-    line) — pin sentence drafted, one adversarial oracle fixture to
-    be added as its own derivation-carrying commit once ruled.
-    Non-blocking: comment the vestigial R7 Set-dedup as
+    oracle. **R4 bridge case CLOSED 2026-07-30, owner-ruled:
+    applicable AND satisfying** (decisive reason recorded in the
+    OPPONENT-MODEL.md addendum, `d6520b7`: a bridge-excluding reading
+    logs a failure for a move that extended her longest line — a
+    false negative poisoning the exact habit the rule measures; any
+    future naive-stack/bridge distinction returns as a SEPARATE rule,
+    the blocks_diagonal precedent, never an R4 exclusion). Oracle
+    fixture `r4-bridge-two-sub-L-runs` committed alone (`aed8e42`,
+    direct extension deliberately present so the poisoning scenario
+    is real); verifier re-derived all seven rules independently
+    (MATCH ×7) and discharged the owner's mutation condition
+    exactly: a per-side-only R4 mutant fails the named fixture on
+    `extends_own.satisfied` alone, `applicable` surviving via the
+    direct extension — the correct failure mode, no other casualty.
+    One ASCII-diagram typo in the derivation fixed post-audit
+    (replay-confirmed zero effect). Tests 519→520.
+    Non-blocking carry: comment the vestigial R7 Set-dedup as
     belt-and-suspenders (follow-up).
 - **Wave 15 — model UI + code gate** (`web-ui`, then `verifier` + owner):
   prediction display visually distinct from optimal (ROADMAP gate #2),

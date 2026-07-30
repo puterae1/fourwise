@@ -416,7 +416,7 @@ export const classifierOracleCases: ClassifierOracleCase[] = [
     },
     derivation:
       'Board immediately before the classified move (0-indexed columns; row 0 = bottom):\n' +
-      '  row1: Y . . . Y . Y\n' +
+      '  row1: Y Y . . Y . Y\n' +
       '  row0: R R . . R . R\n' +
       '        0 1 2 3 4 5 6\n' +
       'Red (the opponent) has row-0 columns 0-1 (a length-2 line, L=2 -- the pin R4 floor) plus two ISOLATED red singles at column 4 and column 6, ' +

@@ -118,7 +118,14 @@
     detached (`nohup caffeinate -i`, log file), NEVER inside a Claude
     Code session; checkpoint is flush-per-line, kill-9-safe, resumable;
     generation TT goes well above 64 MB.
-11. **No placeholder data anywhere in the UI** — unknown says unknown.
+11. **Oracle-first commits (owner rule, 2026-07-30):** when a wave's
+    tests rest on hand-derived expected values, the fixtures WITH their
+    expectations are committed in a SEPARATE commit BEFORE any
+    implementation code exists. Git history then proves the oracle
+    predates the implementation — a verifier can check a timestamp; it
+    cannot check a promise. First applied: Wave 14 (opponent-model
+    classifier).
+12. **No placeholder data anywhere in the UI** — unknown says unknown.
     Terminal display beats analysis display for PRESENT-TENSE claims
     about the current position; backward-looking provenance records
     (partial badge, level qualifier) are exempt (SPEC §3.2 falsity test,
@@ -432,12 +439,26 @@ before Wave 14 delegation:**
   ahead of the wave (design-lead §§15–19, owner-ratified).
   **DEPLOYED 2026-07-29: run 30447951636 green (owner-ordered publish);
   live site 200, book.bin serving at 1,165,492 B.**
-- **Wave 14 — opponent model core, logic only** (`web-ui`, test-first):
-  seven-rule classifier per the approved PIN 1 definitions (adversarial
-  `blocks_diagonal` fixtures per the owner addition), Beta-Bernoulli
-  updates with the doc's priors as pseudo-counts, prediction scoring +
-  normalisation, top-3 with confidence, exploitation summaries per PIN 2,
-  PIN 3 weighting, 20-game floor as pure logic. No UI.
+- **Wave 14 — opponent model core, logic only** (`web-ui`, test-first,
+  SPLIT per the owner's oracle-first rule 2026-07-30):
+  - **14a — the oracle:** hand-built fixtures WITH expected
+    classifications, derived from OPPONENT-MODEL.md's pinned
+    definitions by hand (derivation recorded per case, citing D/R
+    numbers), committed ALONE before any classifier code exists.
+    Includes the adversarial `blocks_diagonal` set (dual-direction
+    threat cell, block-horizontal-miss-diagonal, diagonal-only with
+    play-elsewhere, both diagonal directions), D3 taken-win-exclusive
+    vs missed-win-observes-all cases, R4 floor, R6 first-move, R7
+    stacked-threat exclusion, and PIN 2/D6 weighted-threshold boundary
+    arithmetic as data. Verifier re-derives the expectations against
+    the pins BEFORE 14b starts; any fixture fix lands as its own
+    derivation-carrying commit.
+  - **14b — the classifier:** seven-rule classifier + Beta-Bernoulli
+    updates (D7 priors), prediction scoring + normalisation, top-3
+    with confidence, exploitation firing per PIN 2 as amended by D6,
+    PIN 3 weighting, 20-game floor as pure logic. Tests consume the
+    committed 14a fixtures VERBATIM — editing a fixture inside 14b is
+    an audit red flag. No UI.
 - **Wave 15 — model UI + code gate** (`web-ui`, then `verifier` + owner):
   prediction display visually distinct from optimal (ROADMAP gate #2),
   honest confidence including low (gate #3), below-20 count-and-needed

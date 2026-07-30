@@ -453,12 +453,30 @@ before Wave 14 delegation:**
     arithmetic as data. Verifier re-derives the expectations against
     the pins BEFORE 14b starts; any fixture fix lands as its own
     derivation-carrying commit.
-  - **14b — the classifier:** seven-rule classifier + Beta-Bernoulli
-    updates (D7 priors), prediction scoring + normalisation, top-3
-    with confidence, exploitation firing per PIN 2 as amended by D6,
-    PIN 3 weighting, 20-game floor as pure logic. Tests consume the
-    committed 14a fixtures VERBATIM — editing a fixture inside 14b is
-    an audit red flag. No UI.
+  - **14b — the classifier: COMPLETE, verifier PASS 2026-07-30 (all 7
+    criteria).** Delivered: classifier (D1–D7/R1–R7, board mechanics
+    reused from the game layer), per-label Beta state (D7 priors
+    checked value-by-value; weighted and raw tracked separately; PIN 4
+    label isolation non-vacuously tested), prediction scoring +
+    top-3, exploitation firing on WEIGHTED ≥ 6 with raw-only display
+    (emitted shape asserted to carry no posterior field), 20-whole-
+    game floor. Oracle files byte-identical to `78749b0`
+    (SHA-verified); oracle-consumption tests import, never restate.
+    Five mutations caught (3 implementer-enumerated re-applied + 2
+    verifier-own; the verifier's first R7 attack was a no-op because
+    the protection is structural — threatCells emits one entry per
+    column by construction — documented, not a gap). Tests 460→519.
+    **R4 interpretation ruled FAITHFUL AND FORCED** (verifier
+    re-derived the fixture board by hand): "making it longer" =
+    resulting connected run strictly longer than L, implemented as
+    neighbour-sum ≥ L; an == reading contradicts the committed
+    oracle. OWNER RULING PENDING on the R4 pin addendum: the
+    untested bridge case (a move joining two sub-L runs whose
+    combination reaches L, neither side alone being the length-L
+    line) — pin sentence drafted, one adversarial oracle fixture to
+    be added as its own derivation-carrying commit once ruled.
+    Non-blocking: comment the vestigial R7 Set-dedup as
+    belt-and-suspenders (follow-up).
 - **Wave 15 — model UI + code gate** (`web-ui`, then `verifier` + owner):
   prediction display visually distinct from optimal (ROADMAP gate #2),
   honest confidence including low (gate #3), below-20 count-and-needed

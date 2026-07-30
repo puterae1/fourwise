@@ -487,7 +487,9 @@ before Wave 14 delegation:**
     One ASCII-diagram typo in the derivation fixed post-audit
     (replay-confirmed zero effect). Tests 519→520.
     Non-blocking carry: comment the vestigial R7 Set-dedup as
-    belt-and-suspenders (follow-up).
+    belt-and-suspenders (follow-up). Catch-up deploy 2026-07-30: run
+    30536552957 green — live site current through `f932d31` (model
+    core ships inert, no UI consumes it until Wave 15).
 - **Wave 15 — model UI + code gate** (`web-ui`, then `verifier` + owner):
   prediction display visually distinct from optimal (ROADMAP gate #2),
   honest confidence including low (gate #3), below-20 count-and-needed

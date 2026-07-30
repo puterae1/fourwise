@@ -400,6 +400,47 @@ export const classifierOracleCases: ClassifierOracleCase[] = [
       'either. R4: reds own length-3 diagonal cannot be extended by any legal move (its only open end, column 2 row 3, is not playable) -- ' +
       'inapplicable. R5: column 2 is centre, satisfied. R6: her previous move was column 3, not column 2 -- applicable, failed.',
   },
+  {
+    id: 'r4-bridge-two-sub-L-runs',
+    title: 'R4 addendum: a bridging move satisfies extends_own even with a direct extension also on offer',
+    moves: [0, 0, 1, 1, 4, 4, 6, 6, 5],
+    seat: { firstMover: 'red', userColour: 'yellow' },
+    expected: {
+      takes_win: { applicable: false, satisfied: null },
+      blocks_loss: { applicable: false, satisfied: null },
+      blocks_diagonal: { applicable: false, satisfied: null },
+      extends_own: { applicable: true, satisfied: true },
+      centre_bias: { applicable: true, satisfied: false },
+      repeats_column: { applicable: true, satisfied: false },
+      builds_double: { applicable: true, satisfied: false },
+    },
+    derivation:
+      'Board immediately before the classified move (0-indexed columns; row 0 = bottom):\n' +
+      '  row1: Y . . . Y . Y\n' +
+      '  row0: R R . . R . R\n' +
+      '        0 1 2 3 4 5 6\n' +
+      'Red (the opponent) has row-0 columns 0-1 (a length-2 line, L=2 -- the pin R4 floor) plus two ISOLATED red singles at column 4 and column 6, ' +
+      'each below the floor on its own, with column 5 the empty gap between them. R1: no legal drop completes four for red anywhere (the richest ' +
+      'row-0 run reachable is 3, at column 2 or column 3) -- inapplicable, so R2/R3 are also inapplicable by their own gate; independently, no ' +
+      'yellow cell anywhere reaches a completed four either (checked every landing cell by hand: max total run through any axis is 2), so there is ' +
+      'no pending loss against her to complicate the picture -- the position is deliberately clean of R1/R2/R3, per the instruction to keep the ' +
+      'fixture sharp. R4 -- the decisive geometry: L=2 (row-0 cols 0-1). Column 2 is a DIRECT extension of that exact line (its landing cell has ' +
+      'the length-2 run 0-1 immediately on one side, extending it to a 3-run 0-1-2) -- this is the "direct extension also available" column the ' +
+      'ruling requires be present so the poisoning scenario is real, not hypothetical. Column 5 -- the move actually played -- is the BRIDGE: its ' +
+      'landing cell has the column-4 red single (run length 1, strictly < L) on its left and the column-6 red single (run length 1, strictly < L) ' +
+      'on its right; 1+1 = 2 = L, so the combined connected run after playing it is columns 4-5-6, length 3 = L+1. Per the R4 addendum ' +
+      '(owner-ruled 2026-07-30): "making it longer" means the resulting run is >= L+1, not that either side alone must already carry the ' +
+      'length-L line -- so this bridge is BOTH applicable (a legal move joins two sub-L runs into an L+1 run) AND satisfying when played. A ' +
+      'per-side-only reading of R4 (checking only whether one flank alone reaches length L, rather than the summed flanks) would still call R4 ' +
+      'applicable here (column 2 still qualifies on its own), but would flip column 5 to satisfied=false purely because neither of ITS flanks ' +
+      'individually reaches 2 -- exactly the false-negative "failure logged for a move that extended her longest line" the addendum names as the ' +
+      'decisive reason bridge-exclusion is wrong; that is the mutation this fixture is built to catch. R5: column 5 is not a centre column ' +
+      '(internal {2,3,4}, D4) -- applicable (columns 2-4 are legal), failed. R6: her previous move (2 plies back) was column 6, not column 5 -- ' +
+      'applicable, failed. R7: playing column 5 leaves exactly one distinct winning column standing afterward (column 3, completing cols 3-4-5-6) ' +
+      '-- not a double, so builds_double is not satisfied by the move played; it IS genuinely applicable, though, since a different legal move ' +
+      '(column 3 itself) would have left TWO distinct winning columns open (column 2 and column 5, each completing a separate four) -- applicable, ' +
+      'failed for the move actually played.',
+  },
 ];
 
 // ---------------------------------------------------------------------------

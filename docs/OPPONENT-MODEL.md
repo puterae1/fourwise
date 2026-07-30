@@ -154,6 +154,26 @@ orchestrator's draft.
   Applicable: such a line exists AND ≥1 legal move's landing cell joins a
   length-`L` line, making it longer. Satisfied: `m` is such a move.
   Contiguous discs only; gaps do not count.
+- **R4 addendum (owner-ruled 2026-07-30 — the bridge case):** "making
+  it longer" means the resulting connected run is strictly longer than
+  `L` (length ≥ L+1), not that one side of the landing cell must itself
+  carry the length-`L` line. A BRIDGING move — one whose landing cell
+  joins two runs each shorter than `L` into a combined run of length
+  ≥ L+1 — is applicable AND, when played, satisfying. Decisive reason:
+  under a bridge-excluding reading, a position offering both a direct
+  extension and a bridge where she plays the BRIDGE records R4 as
+  applicable-and-failed — a failure logged for a move that extended
+  her longest line. That is a false negative poisoning the exact habit
+  the rule measures; exclusion only behaves sensibly when the bridge
+  is the only extending move, which is not a property a rule
+  definition may depend on. If the naive-stack vs bridge distinction
+  ever matters, it returns as a SEPARATE rule (the
+  blocks_diagonal-from-blocks_loss precedent) — never as an exclusion
+  from R4. The bridge case is pinned by a dedicated oracle fixture
+  committed with its derivation and MUTATION-TESTED (a per-side-only
+  R4 reading must fail that named fixture) — a fixture that merely
+  pins current behaviour without a failing mutation proves nothing
+  (STATUS standing rule 7 in a different hat).
 - **R5 `centre_bias`** — Applicable: ≥1 centre column (D4) legal.
   Satisfied: `m` is in a centre column.
 - **R6 `repeats_column`** — Applicable: she has a previous move in this

@@ -174,7 +174,7 @@ export const classifierOracleCases: ClassifierOracleCase[] = [
       'horizontal cell and leaving the diagonal one standing. R2 applicable (>=1 user threat cell, takes_win inapplicable), satisfied (column 1 ' +
       'IS a threat cell). R3 applicable (the column-6 cell is diagonal-carrying), satisfied=FALSE (the blocked cell carries only "horizontal" in ' +
       'its dirs, not diagonal) -- exactly the pinned "sees-horizontals-misses-diagonals" asymmetry: R2 success, R3 failure. R4: yellows longest ' +
-      'line is length 2 (col 5 row 0 - col 6 row 1, a \\-diagonal); column 4 legally extends it to 3, but she played column 1 instead -- ' +
+      'line is length 2 (col 6 row 0 - col 5 row 1, a \\-diagonal); column 4 legally extends it to 3, but she played column 1 instead -- ' +
       'applicable, failed. R5: column 1 is not centre -- applicable, failed. R6: her previous move was column 0, not column 1 -- applicable, ' +
       'failed.',
   },
